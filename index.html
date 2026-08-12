@@ -787,6 +787,48 @@ const DRINK_EMOJI = { bier: '🍺 Bier', wein: '🍷 Wein', cocktail: '🍸 Cock
 const LOOKING_FOR_LABEL = { offen: 'Offen', flirt: 'Flirt', freundschaft: 'Freundschaft', beziehung: 'Beziehung', one_night_stand: 'One Night Stand 🔥', ueberrasch_mich: 'Überrasch mich 🎲', tanzpartner: 'Tanzpartner für heute 💃' };
 function labelFor(map, key) { return map[key] || key; }
 
+// ---------- Haptik & Sound Feedback ----------
+// Dependency-free by design: navigator.vibrate() for haptics (Android/most
+// mobile browsers; iOS Safari silently ignores it — never throws) and the
+// Web Audio API for short synthesized tones, so no audio file assets needed.
+let audioCtx = null;
+function getAudioCtx() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!audioCtx) audioCtx = new Ctx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+// Most mobile browsers block audio until a real user gesture happens — this
+// unlocks/creates the context on the very first tap anywhere in the app.
+document.addEventListener('pointerdown', () => { try { getAudioCtx(); } catch (e) {} }, { once: true });
+function playTone(freq, durMs, delayMs, type) {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const start = ctx.currentTime + (delayMs || 0) / 1000;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.16, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + durMs / 1000);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + durMs / 1000 + 0.03);
+  } catch (e) {}
+}
+function vibrate(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} }
+// Short, subtle tap — swipe left/right, chip taps, button presses.
+function feedbackTap() { vibrate(15); }
+// Bigger buzz + two-tone chime — mutual crush, random-match pairing, new-crush toast.
+function feedbackMatch() {
+  vibrate([40, 60, 90]);
+  playTone(587.33, 140, 0);   // D5
+  playTone(880, 220, 130);    // A5
+}
+
 // ---------- Supabase-Auth / RPC ----------
 // Every visitor gets a real anonymous Supabase-Auth session on load (requires
 // "Anonymous sign-ins" enabled in the project's Auth settings). This replaces
@@ -814,18 +856,20 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // before surfacing "Kurzer Aussetzer" — real errors from the DB (e.g. a raised
 // exception) come back as a normal Postgrest error, not a fetch failure, so they
 // still fail fast without a pointless retry.
-async function callRpc(name, args, _retried) {
+async function callRpc(name, args, _attempt) {
+  const attempt = _attempt || 0;
+  const MAX_RETRIES = 2; // flaky venue WiFi can drop more than one request in a row
   let data, error;
   try {
     ({ data, error } = await sb.rpc(name, args || {}));
   } catch (networkErr) {
-    if (!_retried) { await sleep(900); return callRpc(name, args, true); }
+    if (attempt < MAX_RETRIES) { await sleep(600 * (attempt + 1)); return callRpc(name, args, attempt + 1); }
     throw new Error('network_error');
   }
   if (error) {
-    if (!_retried && /fetch|network|Failed to fetch/i.test(error.message || '')) {
-      await sleep(900);
-      return callRpc(name, args, true);
+    if (attempt < MAX_RETRIES && /fetch|network|Failed to fetch/i.test(error.message || '')) {
+      await sleep(600 * (attempt + 1));
+      return callRpc(name, args, attempt + 1);
     }
     throw new Error(error.message || error.code || 'unbekannter Fehler');
   }
@@ -1046,7 +1090,7 @@ async function loadNextCandidate() {
     const g = currentCandidate;
     area.innerHTML = `
       <div class="swipe-card">
-        <div class="swipe-photo">${avatarInner(g.photo_url, '🙂')}</div>
+        <div class="swipe-photo">${avatarInner(g.photo_url, '<span style="font-size:120px; font-weight:800; color:rgba(255,255,255,0.92); text-shadow:0 4px 18px rgba(0,0,0,0.25);">' + esc(initials(g.name)) + '</span>')}</div>
         <div class="swipe-body">
           <h3>${esc(g.name)}${g.age ? ' <span class="age-suffix">' + g.age + '</span>' : ''}</h3>
           <div class="meta">${esc(labelFor(LOOKING_FOR_LABEL, g.looking_for || 'offen'))} · interessiert an ${esc(INTERESTED_IN_LABEL[g.interested_in] || g.interested_in || '–')}${g.home_location ? ' · ' + esc(g.home_location) : ''}</div>
@@ -1068,8 +1112,8 @@ async function loadNextCandidate() {
       ${chipRowHtml('inviteChips', ACTIVITY_EMOJI)}
     `;
     wireChipRow('inviteChips', (val) => { selectedInvite = val; }, false);
-    document.getElementById('swipeNo').addEventListener('click', () => doSwipe('pass'));
-    document.getElementById('swipeCrush').addEventListener('click', () => doSwipe('crush'));
+    document.getElementById('swipeNo').addEventListener('click', () => { feedbackTap(); doSwipe('pass'); });
+    document.getElementById('swipeCrush').addEventListener('click', () => { feedbackTap(); doSwipe('crush'); });
     document.getElementById('randomIcebreakerBtn').addEventListener('click', () => {
       const pick = ICEBREAKER_SUGGESTIONS[Math.floor(Math.random() * ICEBREAKER_SUGGESTIONS.length)];
       document.getElementById('icebreakerInput').value = pick;
@@ -1089,7 +1133,7 @@ async function doSwipe(response) {
   if (crushBtn) crushBtn.disabled = true;
   const icebreakerEl = document.getElementById('icebreakerInput');
   const icebreaker = icebreakerEl ? icebreakerEl.value.trim() : '';
-  const inviteLine = selectedInvite ? labelFor(ACTIVITY_EMOJI, selectedInvite) + ' – Na? 😉' : '';
+  const inviteLine = selectedInvite ? labelFor(ACTIVITY_EMOJI, selectedInvite) + '? 😉' : '';
   const combinedMsg = [inviteLine, icebreaker].filter(Boolean).join('\n');
   const icebreakerArg = (response === 'crush' && combinedMsg) ? combinedMsg : null;
   try {
@@ -1097,6 +1141,7 @@ async function doSwipe(response) {
     // A 'pass' (No) swipe returns no row — only 'crush' swipes ever produce a match record.
     const m = rows && rows[0];
     if (m && m.mutual) {
+      feedbackMatch();
       const seen = getSeenMatches();
       seen.add(m.id);
       saveSeenMatches(seen);
@@ -1164,6 +1209,7 @@ document.getElementById('crushToast').addEventListener('click', () => {
   if (toastClickHandler) toastClickHandler();
 });
 function showCrushToast(label) {
+  feedbackMatch();
   showToast('🎉 Neuer Crush mit ' + label + '!', () => showTab('matches'));
 }
 async function pollForNewCrushes() {
@@ -1395,7 +1441,7 @@ function toggleInvitePanel(panel, matchId, afterSend) {
   }, false);
 
   async function sendInvite(value) {
-    const label = labelFor(ACTIVITY_EMOJI, value) + ' – Na? 😉';
+    const label = labelFor(ACTIVITY_EMOJI, value) + '? 😉';
     panel.style.pointerEvents = 'none';
     statusEl.innerHTML = '<div class="invite-status-msg">Wird gesendet…</div>';
     statusEl.className = 'invite-status';
@@ -1588,6 +1634,9 @@ function renderProfileEdit() {
   el.innerHTML = `
     <label for="editName">Name</label>
     <input id="editName" type="text" value="${esc(g.name)}">
+    <label for="editQrCode">Crush Name</label>
+    <input id="editQrCode" type="text" value="${esc(g.qr_code || '')}">
+    <div id="editQrCodeErr" class="err-msg"></div>
     <div class="field-row">
       <div>
         <label for="editGender">Geschlecht</label>
@@ -1642,6 +1691,7 @@ function renderProfileEdit() {
     <button class="primary-btn" id="saveProfileBtn">Speichern</button>
     <button class="secondary-btn" id="cancelEditBtn">Abbrechen</button>
     <div id="editProfileErr" class="err-msg"></div>
+    <button class="secondary-btn danger-btn" id="checkoutBtn2" style="margin-top:18px;">Auschecken</button>
   `;
   wireChipRow('editInterestsChips', activeInterests);
   wireChipRow('editMusicChips', activeMusic);
@@ -1721,22 +1771,44 @@ function renderProfileEdit() {
   });
 
   document.getElementById('cancelEditBtn').addEventListener('click', renderProfileEdit);
+  document.getElementById('checkoutBtn2').addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    if (btn.disabled) return;
+    if (!confirm('Wirklich auschecken? Du wirst vom Event abgemeldet.')) return;
+    btn.disabled = true;
+    try {
+      await callRpc('self_checkout', {});
+      currentProfile = null;
+      currentCandidate = null;
+      document.getElementById('mainScreen').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('loginQr').value = '';
+      document.getElementById('loginErr').textContent = '';
+    } catch (e) {
+      alert('Fehler: ' + (e.message || e));
+      btn.disabled = false;
+    }
+  });
   document.getElementById('saveProfileBtn').addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
     if (btn.disabled) return;
     const errEl = document.getElementById('editProfileErr');
     const name = document.getElementById('editName').value.trim();
+    const qrCode = document.getElementById('editQrCode').value.trim();
+    const qrErrEl = document.getElementById('editQrCodeErr');
     const gender = document.getElementById('editGender').value;
     const interestedIn = document.getElementById('editInterestedIn').value;
     const age = document.getElementById('editAge').value.trim();
     const lookingFor = document.getElementById('editLookingFor').value;
     const location = document.getElementById('editLocation').value.trim();
+    if (qrErrEl) qrErrEl.textContent = '';
     if (!name) { errEl.textContent = 'Name darf nicht leer sein.'; return; }
+    if (!qrCode) { if (qrErrEl) qrErrEl.textContent = 'Crush Name darf nicht leer sein.'; return; }
     if (age && (Number(age) < 18 || Number(age) > 99)) { errEl.textContent = 'Alter muss zwischen 18 und 99 liegen.'; return; }
     btn.disabled = true;
     try {
       const rows = await callRpc('update_my_profile', {
-        p_name: name, p_gender: gender, p_interested_in: interestedIn, p_age: age ? Number(age) : null,
+        p_name: name, p_qr_code: qrCode, p_gender: gender, p_interested_in: interestedIn, p_age: age ? Number(age) : null,
         p_music_preferences: Array.from(activeMusic), p_favorite_drinks: Array.from(activeDrinks),
         p_looking_for: lookingFor, p_interests: Array.from(activeInterests),
         p_home_location: location || null, p_match_radius_km: null, p_min_age_preference: null, p_max_age_preference: null,
@@ -1747,7 +1819,12 @@ function renderProfileEdit() {
       renderProfileEdit();
       showToast('✅ Profil gespeichert');
     } catch (e) {
-      errEl.textContent = friendlyErrorMessage(e);
+      const msg = friendlyErrorMessage(e);
+      if (((e && e.message) || '').includes('qr_code_already_claimed') && qrErrEl) {
+        qrErrEl.textContent = msg;
+      } else {
+        errEl.textContent = msg;
+      }
       btn.disabled = false;
     }
   });
@@ -1968,8 +2045,16 @@ async function renderPostsExtra(el, kind, icon, title, formLabel, placeholder, l
 // starts my own wait — in which case we poll get_my_random_match() until
 // someone else joins and pairs with me, or the wait expires.
 let randomMatchTimer = null;
+let randomMatchWaitStart = null;
+// Kept true while a search is active even if the guest navigates to another
+// tab (Swipe/Crushes/Profil) — the randomMatchArea DOM node disappears then,
+// but polling keeps running in the background so a pairing still triggers
+// the toast + vibration below instead of silently resolving off-screen.
+let randomMatchActive = false;
 function stopRandomMatchPolling() {
   if (randomMatchTimer) { clearInterval(randomMatchTimer); randomMatchTimer = null; }
+  randomMatchActive = false;
+  randomMatchWaitStart = null;
 }
 function renderGameExtra(el) {
   stopRandomMatchPolling();
@@ -1996,15 +2081,20 @@ async function startRandomMatch() {
   stopRandomMatchPolling();
   const area = document.getElementById('randomMatchArea');
   if (!area) return;
-  area.innerHTML = '<div class="loading">Suche jemanden…</div><button class="secondary-btn" id="randomMatchCancelBtn">Abbrechen</button>';
+  area.innerHTML = '<div class="loading">Suche jemanden…</div><div class="hint" id="randomMatchHint" style="margin:2px 0 0;"></div><button class="secondary-btn" id="randomMatchCancelBtn">Abbrechen</button>';
   document.getElementById('randomMatchCancelBtn').addEventListener('click', cancelRandomMatch);
   try {
     const rows = await callRpc('join_random_match', {});
     const r = rows && rows[0];
     if (r && !r.waiting && r.partner_id) {
+      feedbackMatch();
       showRandomMatchResult(r);
     } else {
-      randomMatchTimer = setInterval(pollRandomMatch, 1800);
+      randomMatchActive = true;
+      randomMatchWaitStart = Date.now();
+      // Faster cadence than a normal poll (was 1800ms) — two people tapping
+      // "Los geht's" at the same moment should feel close to instant.
+      randomMatchTimer = setInterval(pollRandomMatch, 1200);
     }
   } catch (e) {
     if (!document.getElementById('randomMatchArea')) return;
@@ -2015,19 +2105,37 @@ async function startRandomMatch() {
 }
 
 async function pollRandomMatch() {
+  // Deliberately does NOT bail out when randomMatchArea is gone (e.g. the
+  // guest switched to Swipe/Crushes while waiting) — keeps polling in the
+  // background so a pairing still surfaces via toast + vibration instead of
+  // silently resolving off-screen and only appearing once they come back.
+  if (!randomMatchActive) { stopRandomMatchPolling(); return; }
   const area = document.getElementById('randomMatchArea');
-  if (!area) { stopRandomMatchPolling(); return; }
+  if (area) {
+    const hint = document.getElementById('randomMatchHint');
+    if (hint && randomMatchWaitStart) {
+      const waitedS = Math.floor((Date.now() - randomMatchWaitStart) / 1000);
+      hint.textContent = waitedS > 12 ? 'Kann bis zu 45 Sekunden dauern…' : '';
+    }
+  }
   try {
     const rows = await callRpc('get_my_random_match', {});
     const r = rows && rows[0];
     if (r && r.partner_id) {
       stopRandomMatchPolling();
-      showRandomMatchResult(r);
+      feedbackMatch();
+      if (area) {
+        showRandomMatchResult(r);
+      } else {
+        showToast('🔀 Gepaired mit ' + (r.partner_name || 'jemandem') + '!', () => { extrasSubtab = 'game'; showTab('extras'); });
+      }
     } else if (r && !r.waiting) {
       // Expired without finding anyone.
       stopRandomMatchPolling();
-      area.innerHTML = '<div class="empty-state" style="margin-top:0; padding:0;">Niemand gefunden 👀<br>Versucht es nochmal!</div>' + randomMatchIdleHtml();
-      document.getElementById('randomMatchBtn').addEventListener('click', startRandomMatch);
+      if (area) {
+        area.innerHTML = '<div class="empty-state" style="margin-top:0; padding:0;">Niemand gefunden 👀<br>Versucht es nochmal!</div>' + randomMatchIdleHtml();
+        document.getElementById('randomMatchBtn').addEventListener('click', startRandomMatch);
+      }
     }
     // else: still waiting, keep polling.
   } catch (e) {
