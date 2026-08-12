@@ -140,6 +140,19 @@
     font-weight: 700;
   }
   .chip:active { transform: scale(0.93); }
+  .chip-add { border-style: dashed; color: #a99bc4; }
+  .chip-custom.selected { background: linear-gradient(90deg, #8b5cf6, #6d28d9); }
+  .chip-add-input {
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1.5px solid #8b5cf6;
+    background: #1c1626;
+    color: #f2eef7;
+    font-size: 13px;
+    font-family: inherit;
+    width: 120px;
+  }
+  .chip-add-input:focus { outline: none; }
 
   /* Swipe card */
   .swipe-card {
@@ -880,12 +893,21 @@ let selectedInvite = null;
 // Builds a row of chip toggles. `activeSet` (used for multi-select) marks
 // which chips start pre-selected; omit it for a single-select row where
 // nothing starts selected.
-function chipRowHtml(containerId, optionsMap, activeSet) {
+// `opts.allowCustom` adds a dashed "+ Eigenes" chip at the end that opens an inline
+// text input, letting the guest add any number of free-text chips (e.g. "Backen")
+// alongside the curated options — used for Interessen/Musik/Getränke.
+function chipRowHtml(containerId, optionsMap, activeSet, opts) {
   const active = activeSet || new Set();
+  const allowCustom = opts && opts.allowCustom;
+  const customEntries = allowCustom ? Array.from(active).filter(v => !(v in optionsMap)) : [];
   return '<div class="chip-row" id="' + containerId + '">' +
     Object.keys(optionsMap).map(key =>
       '<div class="chip ' + (active.has(key) ? 'selected' : '') + '" data-value="' + key + '">' + esc(optionsMap[key]) + '</div>'
     ).join('') +
+    customEntries.map(v =>
+      '<div class="chip chip-custom selected" data-value="' + esc(v) + '" data-custom="1">' + esc(v) + ' ×</div>'
+    ).join('') +
+    (allowCustom ? '<div class="chip chip-add" data-role="add">+ Eigenes</div>' : '') +
   '</div>';
 }
 
@@ -893,11 +915,13 @@ function chipRowHtml(containerId, optionsMap, activeSet) {
 // multi=false: single-select – `activeSetOrOnChange` is a callback invoked with
 // the newly selected value (or null when deselected), matching radio-button behavior.
 function wireChipRow(containerId, activeSetOrOnChange, multi = true) {
-  document.querySelectorAll('#' + containerId + ' .chip').forEach(chip => {
+  const container = document.getElementById(containerId);
+  document.querySelectorAll('#' + containerId + ' .chip:not(.chip-add)').forEach(chip => {
     chip.addEventListener('click', () => {
       if (multi) {
         const activeSet = activeSetOrOnChange;
         const v = chip.dataset.value;
+        if (chip.dataset.custom === '1') { activeSet.delete(v); chip.remove(); return; }
         if (activeSet.has(v)) { activeSet.delete(v); chip.classList.remove('selected'); }
         else { activeSet.add(v); chip.classList.add('selected'); }
       } else {
@@ -909,6 +933,42 @@ function wireChipRow(containerId, activeSetOrOnChange, multi = true) {
       }
     });
   });
+  const addChip = container && container.querySelector('.chip-add');
+  if (addChip) {
+    addChip.addEventListener('click', () => {
+      if (container.querySelector('.chip-add-input')) return;
+      const activeSet = activeSetOrOnChange;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 24;
+      input.placeholder = 'Eigenes eingeben…';
+      input.className = 'chip-add-input';
+      let done = false;
+      const commit = () => {
+        if (done) return;
+        done = true;
+        const val = input.value.trim();
+        if (val) {
+          activeSet.add(val);
+          const chip = document.createElement('div');
+          chip.className = 'chip chip-custom selected';
+          chip.dataset.value = val;
+          chip.dataset.custom = '1';
+          chip.textContent = val + ' ×';
+          chip.addEventListener('click', () => { activeSet.delete(val); chip.remove(); });
+          container.insertBefore(chip, addChip);
+        }
+        input.remove();
+      };
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { done = true; input.remove(); }
+      });
+      input.addEventListener('blur', commit);
+      container.insertBefore(input, addChip);
+      input.focus();
+    });
+  }
 }
 
 async function loadNextCandidate() {
@@ -1509,11 +1569,11 @@ function renderProfileEdit() {
     <div class="hint" style="margin-top:4px;">Oder: rechts einfach ein Emoji als Profilbild eintippen (Emoji-Tastatur deines Handys nutzen).</div>
     <div id="photoUploadErr" class="err-msg"></div>
     <label>Interessen</label>
-    ${chipRowHtml('editInterestsChips', INTEREST_EMOJI, activeInterests)}
+    ${chipRowHtml('editInterestsChips', INTEREST_EMOJI, activeInterests, { allowCustom: true })}
     <label>Musik</label>
-    ${chipRowHtml('editMusicChips', MUSIC_EMOJI, activeMusic)}
+    ${chipRowHtml('editMusicChips', MUSIC_EMOJI, activeMusic, { allowCustom: true })}
     <label>Getränke</label>
-    ${chipRowHtml('editDrinksChips', DRINK_EMOJI, activeDrinks)}
+    ${chipRowHtml('editDrinksChips', DRINK_EMOJI, activeDrinks, { allowCustom: true })}
     <label>Interessiert an einem…</label>
     ${chipRowHtml('editActivityChips', ACTIVITY_EMOJI, activeActivities)}
     <div id="editAgeErr" class="err-msg"></div>
