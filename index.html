@@ -1570,7 +1570,7 @@ async function loadProfile() {
     if (error) throw new Error(error.message);
     if (!rows.length) { el.innerHTML = '<div class="empty-state">Kein Profil gefunden.</div>'; return; }
     currentProfile = rows[0];
-    renderProfileEdit();
+    renderProfileView();
   } catch (e) {
     renderFriendlyError(el, e, loadProfile, 'retryProfile');
   }
@@ -1585,7 +1585,7 @@ function renderProfileView() {
   el.innerHTML = `
     <div style="text-align:center; margin-bottom:18px;">
       <div class="avatar" style="width:72px;height:72px;font-size:24px;margin:0 auto 10px;overflow:hidden;">${avatarInner(g.photo_url, esc(initials(g.name)))}</div>
-      <h3 style="margin:0; font-size:20px;">${esc(g.name)}${g.age ? ' <span class="age-suffix">' + g.age + '</span>' : ''}</h3>
+      <h3 style="margin:0; font-size:20px;">${nameDisplayHtml(g.name, g.qr_code)}${g.age ? ' <span class="age-suffix">' + g.age + '</span>' : ''}</h3>
     </div>
     <div class="profile-card">
       <div class="profile-row"><div class="row-label"><span class="row-icon">🧑</span>Geschlecht</div><div class="row-value">${esc(g.gender || '–')}</div></div>
@@ -1771,7 +1771,7 @@ function renderProfileEdit() {
     }
   });
 
-  document.getElementById('cancelEditBtn').addEventListener('click', renderProfileEdit);
+  document.getElementById('cancelEditBtn').addEventListener('click', renderProfileView);
   document.getElementById('checkoutBtn2').addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
     if (btn.disabled) return;
@@ -1817,7 +1817,7 @@ function renderProfileEdit() {
         p_photo_url: (photoChanged && pendingPhotoDataUrl) ? pendingPhotoDataUrl : null
       });
       currentProfile = rows[0];
-      renderProfileEdit();
+      renderProfileView();
       showToast('✅ Profil gespeichert');
     } catch (e) {
       const msg = friendlyErrorMessage(e);
