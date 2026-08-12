@@ -88,17 +88,30 @@
   input[type=text]::placeholder, input[type=number]::placeholder { color: #695d7d; }
   .photo-upload-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
   .photo-preview {
-    width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+    width: 76px; height: 76px; border-radius: 50%; object-fit: cover;
     border: 1px solid #362c47; background: #1c1626; flex-shrink: 0;
   }
   .photo-preview-empty {
-    width: 56px; height: 56px; border-radius: 50%; border: 1px dashed #362c47;
-    display: flex; align-items: center; justify-content: center; color: #695d7d; font-size: 20px; flex-shrink: 0;
+    width: 76px; height: 76px; border-radius: 50%; border: 1px dashed #362c47;
+    display: flex; align-items: center; justify-content: center; color: #695d7d; font-size: 26px; flex-shrink: 0;
   }
   .file-upload-btn {
     padding: 9px 14px; border-radius: 10px; border: 1px solid #362c47; background: #1c1626;
     color: #c9a7ff; font-size: 13px; font-weight: 600; cursor: pointer;
   }
+  .avatar-picker { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 8px; }
+  .avatar-picker-btns { display: flex; gap: 10px; width: 100%; }
+  .avatar-picker-btn {
+    flex: 1; text-align: center; padding: 11px 10px; border-radius: 12px;
+    border: 1px solid #362c47; background: #1c1626; color: #c9a7ff;
+    font-size: 13px; font-weight: 700; cursor: pointer; user-select: none;
+  }
+  .avatar-picker-btn:active { transform: scale(0.97); }
+  .avatar-emoji-input {
+    width: 100%; text-align: center; font-size: 26px; padding: 11px 4px;
+    border-radius: 12px; border: 1.5px solid #8b5cf6; background: #1c1626; color: #f2eef7;
+  }
+  .avatar-emoji-input.hidden { display: none; }
   .primary-btn {
     width: 100%;
     margin-top: 16px;
@@ -833,6 +846,28 @@ async function checkActiveEvent() {
 }
 checkActiveEvent();
 
+// Rotates the Crush-Name field's placeholder through fun example names so the
+// empty login screen feels alive instead of showing one static example forever.
+const CRUSH_NAME_EXAMPLES = [
+  'NACHTFALTER', 'MONDSCHEIN', 'FUNKELFEE', 'SAMTPFOTE', 'GOLDKEHLE', 'WILDROSE',
+  'STERNENSTAUB', 'ROSENQUARZ', 'SILBERFUCHS', 'DUNKELROT', 'MONDLICHT', 'SCHATTENTANZ',
+  'TRAUMWANDLER', 'EISKOENIGIN', 'LICHTBLITZ', 'FEUERVOGEL', 'SUESSHOLZ', 'PERLENGLANZ',
+  'VELVETROSE', 'NEONHERZ', 'GLITZERKATZE', 'SAMTPANTHER', 'WOLKENKUSS', 'FLAMMENHERZ'
+];
+(function rotateLoginPlaceholder() {
+  const input = document.getElementById('loginQr');
+  let last = '';
+  const tick = () => {
+    if (document.activeElement === input || input.value) return;
+    let next = last;
+    while (next === last) next = CRUSH_NAME_EXAMPLES[Math.floor(Math.random() * CRUSH_NAME_EXAMPLES.length)];
+    last = next;
+    input.placeholder = 'z.B. ' + next;
+  };
+  tick();
+  setInterval(tick, 2600);
+})();
+
 // ---------- Login ----------
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const qr = document.getElementById('loginQr').value.trim();
@@ -1560,13 +1595,16 @@ function renderProfileEdit() {
     <label for="editLocation">Wohnort</label>
     <input id="editLocation" type="text" value="${esc(g.home_location || '')}" placeholder="z.B. Zürich">
     <label>Profilbild</label>
-    <div class="photo-upload-row">
-      <div id="photoPreviewWrap">${renderPhotoPreviewInner(g.photo_url)}</div>
-      <label class="file-upload-btn" for="editPhotoFile">📷 Foto wählen</label>
-      <input type="file" id="editPhotoFile" accept="image/*" style="display:none;">
-      <input type="text" id="editEmojiInput" maxlength="8" placeholder="😀" value="${(g.photo_url && g.photo_url.indexOf('emoji:') === 0) ? esc(g.photo_url.slice(6)) : ''}" style="width:52px;text-align:center;font-size:20px;padding:9px 4px;border-radius:10px;border:1px solid #362c47;background:#1c1626;color:#f2eef7;">
+    <div class="avatar-picker">
+      <div id="photoPreviewWrap" class="avatar-picker-preview">${renderPhotoPreviewInner(g.photo_url)}</div>
+      <div class="avatar-picker-btns">
+        <label class="avatar-picker-btn" for="editPhotoFile">📷 Foto wählen</label>
+        <input type="file" id="editPhotoFile" accept="image/*" style="display:none;">
+        <div class="avatar-picker-btn" id="emojiPickBtn">😀 Emoji wählen</div>
+      </div>
+      <input type="text" id="editEmojiInput" maxlength="8" placeholder="Emoji eintippen…" value="${(g.photo_url && g.photo_url.indexOf('emoji:') === 0) ? esc(g.photo_url.slice(6)) : ''}" class="avatar-emoji-input${(g.photo_url && g.photo_url.indexOf('emoji:') === 0) ? '' : ' hidden'}">
     </div>
-    <div class="hint" style="margin-top:4px;">Oder: rechts einfach ein Emoji als Profilbild eintippen (Emoji-Tastatur deines Handys nutzen).</div>
+    <div class="hint" style="margin-top:6px; text-align:center;">Beim Emoji: Emoji-Tastatur deines Handys nutzen.</div>
     <div id="photoUploadErr" class="err-msg"></div>
     <label>Interessen</label>
     ${chipRowHtml('editInterestsChips', INTEREST_EMOJI, activeInterests, { allowCustom: true })}
@@ -1598,6 +1636,11 @@ function renderProfileEdit() {
     }
     return '<div class="photo-preview-empty">🙂</div>';
   }
+  document.getElementById('emojiPickBtn').addEventListener('click', () => {
+    const input = document.getElementById('editEmojiInput');
+    input.classList.remove('hidden');
+    input.focus();
+  });
   document.getElementById('editEmojiInput').addEventListener('input', (e) => {
     const val = e.target.value.trim();
     document.getElementById('photoUploadErr').textContent = '';
@@ -1644,7 +1687,9 @@ function renderProfileEdit() {
       photoErrEl.textContent = '';
       pendingPhotoDataUrl = dataUrl;
       photoChanged = true;
-      document.getElementById('editEmojiInput').value = '';
+      const emojiInput = document.getElementById('editEmojiInput');
+      emojiInput.value = '';
+      emojiInput.classList.add('hidden');
       document.getElementById('photoPreviewWrap').innerHTML = renderPhotoPreviewInner(pendingPhotoDataUrl);
     } catch (err) {
       photoErrEl.textContent = 'Foto konnte nicht verarbeitet werden. Bitte anderes Foto wählen.';
