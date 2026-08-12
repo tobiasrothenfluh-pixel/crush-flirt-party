@@ -775,6 +775,12 @@ function friendlyErrorMessage(e) {
   const raw = ((e && e.message) || String(e) || '');
   const known = FRIENDLY_ERRORS.find(f => raw.includes(f.match));
   if (known) return known.text;
+  // After 4 retries over ~6s still failing: if the device itself reports no
+  // connection at all, say so directly instead of the generic hiccup message —
+  // that's a different (and more actionable) situation for the guest.
+  if ((raw === 'network_error' || raw === 'timeout') && navigator.onLine === false) {
+    return 'Kein Internet gerade – bitte WLAN/Empfang prüfen und nochmal versuchen.';
+  }
   return 'Kurzer Aussetzer – bitte nochmal versuchen.';
 }
 function renderFriendlyError(container, err, retryFn, retryId) {
@@ -903,19 +909,29 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // before surfacing "Kurzer Aussetzer" — real errors from the DB (e.g. a raised
 // exception) come back as a normal Postgrest error, not a fetch failure, so they
 // still fail fast without a pointless retry.
+// On genuinely bad venue signal (1 bar), a single dropped request can eat several
+// hundred ms to even fail, and one retry often isn't enough — bump to 4 attempts
+// total with growing backoff, and race every attempt against a manual timeout so
+// a request that just hangs (no error, no response) doesn't leave the button
+// stuck forever — it's treated the same as a network error and retried.
 async function callRpc(name, args, _attempt) {
   const attempt = _attempt || 0;
-  const MAX_RETRIES = 2; // flaky venue WiFi can drop more than one request in a row
+  const MAX_RETRIES = 3;
+  const TIMEOUT_MS = 9000;
   let data, error;
   try {
-    ({ data, error } = await sb.rpc(name, args || {}));
+    const result = await Promise.race([
+      sb.rpc(name, args || {}),
+      sleep(TIMEOUT_MS).then(() => { throw new Error('timeout'); })
+    ]);
+    data = result.data; error = result.error;
   } catch (networkErr) {
-    if (attempt < MAX_RETRIES) { await sleep(600 * (attempt + 1)); return callRpc(name, args, attempt + 1); }
+    if (attempt < MAX_RETRIES) { await sleep(700 * Math.pow(2, attempt)); return callRpc(name, args, attempt + 1); }
     throw new Error('network_error');
   }
   if (error) {
     if (attempt < MAX_RETRIES && /fetch|network|Failed to fetch/i.test(error.message || '')) {
-      await sleep(600 * (attempt + 1));
+      await sleep(700 * Math.pow(2, attempt));
       return callRpc(name, args, attempt + 1);
     }
     throw new Error(error.message || error.code || 'unbekannter Fehler');
