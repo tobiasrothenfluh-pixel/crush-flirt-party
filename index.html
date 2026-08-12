@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root { color-scheme: dark; }
@@ -657,6 +658,14 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Renders a guest's photo_url as either a real <img> or, if it's an emoji-as-avatar ("emoji:😀"), a big emoji span.
+function avatarInner(photoUrl, fallbackHtml) {
+  if (!photoUrl) return fallbackHtml;
+  if (photoUrl.indexOf('emoji:') === 0) {
+    return '<span style="font-size:1.9em;line-height:1;">' + esc(photoUrl.slice(6)) + '</span>';
+  }
+  return '<img src="' + esc(photoUrl) + '" style="width:100%;height:100%;object-fit:cover;">';
+}
 const FRIENDLY_ERRORS = [
   { match: 'qr_code_already_claimed', text: 'Dieser Crush Name ist schon von jemand anderem vergeben. Bitte wähle einen anderen Namen.' },
   { match: 'not_checked_in', text: 'Du bist gerade nicht eingecheckt.' },
@@ -917,7 +926,7 @@ async function loadNextCandidate() {
     const g = currentCandidate;
     area.innerHTML = `
       <div class="swipe-card">
-        <div class="swipe-photo">${g.photo_url ? '<img src="' + esc(g.photo_url) + '" style="width:100%;height:100%;object-fit:cover;">' : '🙂'}</div>
+        <div class="swipe-photo">${avatarInner(g.photo_url, '🙂')}</div>
         <div class="swipe-body">
           <h3>${esc(g.name)}${g.age ? ' <span class="age-suffix">' + g.age + '</span>' : ''}</h3>
           <div class="meta">${esc(labelFor(LOOKING_FOR_LABEL, g.looking_for || 'offen'))} · interessiert an ${esc(INTERESTED_IN_LABEL[g.interested_in] || g.interested_in || '–')}${g.home_location ? ' · ' + esc(g.home_location) : ''}</div>
@@ -979,9 +988,7 @@ async function doSwipe(response) {
       const partnerNote = partnerIcebreaker
         ? '<div class="match-partner-invite"><div class="match-partner-invite-label">💌 ' + esc(name) + ' hat dir das geschickt</div><div class="match-partner-invite-text">' + esc(partnerIcebreaker).replace(/\n/g, '<br>') + '</div></div>'
         : '';
-      const partnerAvatar = currentCandidate.photo_url
-        ? '<img src="' + esc(currentCandidate.photo_url) + '" style="width:100%;height:100%;object-fit:cover;">'
-        : esc(initials(name));
+      const partnerAvatar = avatarInner(currentCandidate.photo_url, esc(initials(name)));
       area.innerHTML =
         '<div class="match-result">' +
           '<div class="match-photo-circle">' + partnerAvatar + '</div>' +
@@ -1172,7 +1179,7 @@ async function loadMatches() {
       const hasName = r.partner_name && r.partner_name !== 'Gast';
       const displayName = hasName ? r.partner_name : r.partner_qr;
       const nameHtml = '<span class="name-main">' + esc(displayName) + '</span>';
-      const avatar = r.partner_photo_url ? '<div class="avatar match-avatar" style="overflow:hidden;"><img src="' + esc(r.partner_photo_url) + '" style="width:100%;height:100%;object-fit:cover;"></div>' : '<div class="avatar match-avatar">' + esc(initials(displayName)) + '</div>';
+      const avatar = '<div class="avatar match-avatar" style="overflow:hidden;">' + avatarInner(r.partner_photo_url, esc(initials(displayName))) + '</div>';
       const hasMsg = !!r.last_message;
       const previewText = hasMsg
         ? (r.last_message_is_me ? 'Du: ' + r.last_message : r.last_message)
@@ -1409,7 +1416,7 @@ function renderProfileView() {
   const drinkChips = (g.favorite_drinks||[]).map(i => '<span class="tag">' + esc(labelFor(DRINK_EMOJI, i)) + '</span>').join('');
   el.innerHTML = `
     <div style="text-align:center; margin-bottom:18px;">
-      <div class="avatar" style="width:72px;height:72px;font-size:24px;margin:0 auto 10px;overflow:hidden;">${g.photo_url ? '<img src="' + esc(g.photo_url) + '" style="width:100%;height:100%;object-fit:cover;">' : esc(initials(g.name))}</div>
+      <div class="avatar" style="width:72px;height:72px;font-size:24px;margin:0 auto 10px;overflow:hidden;">${avatarInner(g.photo_url, esc(initials(g.name)))}</div>
       <h3 style="margin:0; font-size:20px;">${esc(g.name)}${g.age ? ' <span class="age-suffix">' + g.age + '</span>' : ''}</h3>
     </div>
     <div class="profile-card">
@@ -1494,10 +1501,12 @@ function renderProfileEdit() {
     <input id="editLocation" type="text" value="${esc(g.home_location || '')}" placeholder="z.B. Zürich">
     <label>Profilbild</label>
     <div class="photo-upload-row">
-      ${g.photo_url ? '<img class="photo-preview" id="photoPreviewImg" src="' + esc(g.photo_url) + '">' : '<div class="photo-preview-empty" id="photoPreviewEmpty">🙂</div>'}
+      <div id="photoPreviewWrap">${renderPhotoPreviewInner(g.photo_url)}</div>
       <label class="file-upload-btn" for="editPhotoFile">📷 Foto wählen</label>
       <input type="file" id="editPhotoFile" accept="image/*" style="display:none;">
+      <input type="text" id="editEmojiInput" maxlength="8" placeholder="😀" value="${(g.photo_url && g.photo_url.indexOf('emoji:') === 0) ? esc(g.photo_url.slice(6)) : ''}" style="width:52px;text-align:center;font-size:20px;padding:9px 4px;border-radius:10px;border:1px solid #362c47;background:#1c1626;color:#f2eef7;">
     </div>
+    <div class="hint" style="margin-top:4px;">Oder: rechts einfach ein Emoji als Profilbild eintippen (Emoji-Tastatur deines Handys nutzen).</div>
     <div id="photoUploadErr" class="err-msg"></div>
     <label>Interessen</label>
     ${chipRowHtml('editInterestsChips', INTEREST_EMOJI, activeInterests)}
@@ -1519,33 +1528,68 @@ function renderProfileEdit() {
 
   let pendingPhotoDataUrl = null;
   let photoChanged = false;
-  document.getElementById('editPhotoFile').addEventListener('change', (e) => {
+  // Shared render for the small profile-picture preview slot: real photo, emoji-as-avatar, or empty placeholder.
+  function renderPhotoPreviewInner(photoUrl) {
+    if (photoUrl && photoUrl.indexOf('emoji:') === 0) {
+      return '<div class="photo-preview-empty" style="font-size:28px;">' + esc(photoUrl.slice(6)) + '</div>';
+    }
+    if (photoUrl) {
+      return '<img class="photo-preview" src="' + esc(photoUrl) + '">';
+    }
+    return '<div class="photo-preview-empty">🙂</div>';
+  }
+  document.getElementById('editEmojiInput').addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    document.getElementById('photoUploadErr').textContent = '';
+    if (!val) return;
+    pendingPhotoDataUrl = 'emoji:' + val;
+    photoChanged = true;
+    document.getElementById('editPhotoFile').value = '';
+    document.getElementById('photoPreviewWrap').innerHTML = renderPhotoPreviewInner(pendingPhotoDataUrl);
+  });
+  // Downscales + re-encodes any photo (incl. multi-MB phone photos/screenshots) to a small JPEG data URL.
+  function compressImageToDataUrl(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('image_decode_failed'));
+        img.onload = () => {
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > h && w > maxDim) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+          else if (h >= w && h > maxDim) { w = Math.round(w * (maxDim / h)); h = maxDim; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  document.getElementById('editPhotoFile').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     const photoErrEl = document.getElementById('photoUploadErr');
     photoErrEl.textContent = '';
     if (!file) return;
-    if (file.size > 400 * 1024) {
-      photoErrEl.textContent = 'Bild zu gross (max. 400 KB). Bitte kleineres Foto wählen.';
-      e.target.value = '';
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      pendingPhotoDataUrl = reader.result;
-      photoChanged = true;
-      const existingImg = document.getElementById('photoPreviewImg');
-      const existingEmpty = document.getElementById('photoPreviewEmpty');
-      if (existingImg) {
-        existingImg.src = pendingPhotoDataUrl;
-      } else if (existingEmpty) {
-        const img = document.createElement('img');
-        img.className = 'photo-preview';
-        img.id = 'photoPreviewImg';
-        img.src = pendingPhotoDataUrl;
-        existingEmpty.replaceWith(img);
+    photoErrEl.textContent = 'Foto wird verkleinert…';
+    try {
+      let dataUrl = await compressImageToDataUrl(file, 800, 0.75);
+      // Very large/detailed originals can still land above ~1.5MB after one pass — compress harder.
+      if (dataUrl.length > 1.5 * 1024 * 1024) {
+        dataUrl = await compressImageToDataUrl(file, 600, 0.6);
       }
-    };
-    reader.readAsDataURL(file);
+      photoErrEl.textContent = '';
+      pendingPhotoDataUrl = dataUrl;
+      photoChanged = true;
+      document.getElementById('editEmojiInput').value = '';
+      document.getElementById('photoPreviewWrap').innerHTML = renderPhotoPreviewInner(pendingPhotoDataUrl);
+    } catch (err) {
+      photoErrEl.textContent = 'Foto konnte nicht verarbeitet werden. Bitte anderes Foto wählen.';
+      e.target.value = '';
+    }
   });
 
   document.getElementById('cancelEditBtn').addEventListener('click', renderProfileView);
