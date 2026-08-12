@@ -883,8 +883,12 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     await ensureSession();
     const eventId = await getActiveEventId();
     if (!eventId) { errEl.textContent = 'Aktuell ist kein Event offen.'; return; }
+    // Prefill the real Name field with the Crush Name they just typed (title-cased if it
+    // was typed ALL CAPS, e.g. "NACHTFALTER" -> "Nachtfalter") instead of a bare "Gast" —
+    // they can still change it in the profile-edit form afterward.
+    const prefillName = (qr === qr.toUpperCase()) ? (qr.charAt(0) + qr.slice(1).toLowerCase()) : qr;
     const rows = await callRpc('self_checkin', {
-      p_event_id: eventId, p_qr_code: qr, p_name: 'Gast', p_gender: 'divers', p_interested_in: 'alle',
+      p_event_id: eventId, p_qr_code: qr, p_name: prefillName, p_gender: 'divers', p_interested_in: 'alle',
       p_age: null, p_music_preferences: [], p_favorite_drinks: [], p_looking_for: 'offen', p_interests: [],
       p_home_location: null, p_match_radius_km: null, p_min_age_preference: null, p_max_age_preference: null,
       p_photo_url: null, p_interested_in_activities: []
@@ -1736,19 +1740,6 @@ function renderProfileEdit() {
 // ---------- Extras (Bonus-Bereich, passwortgeschützt) ----------
 let extrasUnlocked = false;
 let extrasSubtab = 'shoutout';
-const PARTY_GAME_TASKS = [
-  '🍻 Trink einen Schluck, wenn du heute schon jemanden angeflirtet hast.',
-  '💃 Tanz 20 Sekunden lang, ohne die Musik zu hören (Kopfhörer/Ohren zu).',
-  '🤳 Mach mit jemandem hier ein Foto und zeig es später deinen Freund:innen.',
-  '😉 Gib jemandem hier spontan ein ehrliches Kompliment.',
-  '🍹 Tausch für die nächste Runde deinen Drink mit jemand anderem.',
-  '🕺 Erfindet zu zweit einen neuen Handshake.',
-  '🎤 Sing die nächsten 10 Sekunden vom aktuellen Song laut mit.',
-  '📵 Leg dein Handy 5 Minuten weg und rede mit jemand Neuem.',
-  '🤐 Antworte 2 Minuten lang nur mit Gegenfragen.',
-  '💌 Schreib jemandem hier einen Zettel mit einem Kompliment.'
-];
-
 async function renderExtras() {
   const area = document.getElementById('extrasArea');
   if (!extrasUnlocked) {
@@ -1776,7 +1767,7 @@ async function renderExtras() {
     <div class="extras-nav" id="extrasSubnav">
       <div class="extras-nav-item ${extrasSubtab === 'song' ? 'selected' : ''}" data-sub="song"><span class="nav-icon">🎵</span>Musik</div>
       <div class="extras-nav-item ${extrasSubtab === 'shoutout' ? 'selected' : ''}" data-sub="shoutout"><span class="nav-icon">💌</span>Shoutouts</div>
-      <div class="extras-nav-item ${extrasSubtab === 'game' ? 'selected' : ''}" data-sub="game"><span class="nav-icon">🎲</span>Trinkspiel</div>
+      <div class="extras-nav-item ${extrasSubtab === 'game' ? 'selected' : ''}" data-sub="game"><span class="nav-icon">🔀</span>Zufalls-Match</div>
       <div class="extras-nav-item ${extrasSubtab === 'screenmsg' ? 'selected' : ''}" data-sub="screenmsg"><span class="nav-icon">📺</span>Screen-Message</div>
       <div class="extras-nav-item ${extrasSubtab === 'challenge' ? 'selected' : ''}" data-sub="challenge"><span class="nav-icon">🏆</span>Club Challenge</div>
       <div class="extras-nav-item ${extrasSubtab === 'guestlist' ? 'selected' : ''}" data-sub="guestlist"><span class="nav-icon">🎟️</span>Gästeliste</div>
@@ -1955,22 +1946,99 @@ async function renderPostsExtra(el, kind, icon, title, formLabel, placeholder, l
   }
 }
 
+// Random-Match: two (or more) guests tap the button at roughly the same time and
+// get instantly paired up. join_random_match() either finds someone already
+// waiting (same event, joined within the last 45s) and pairs immediately, or
+// starts my own wait — in which case we poll get_my_random_match() until
+// someone else joins and pairs with me, or the wait expires.
+let randomMatchTimer = null;
+function stopRandomMatchPolling() {
+  if (randomMatchTimer) { clearInterval(randomMatchTimer); randomMatchTimer = null; }
+}
 function renderGameExtra(el) {
+  stopRandomMatchPolling();
   el.innerHTML = `
     <div class="extras-card" style="text-align:center;">
       <div class="extras-card-head" style="justify-content:center;">
-        <span class="emoji">🎲</span>
-        <div><h4>Trinkspiel</h4></div>
+        <span class="emoji">🔀</span>
+        <div><h4>Zufalls-Match</h4></div>
       </div>
-      <p class="hint" style="margin:0 0 14px;">Tippe für eine zufällige Party-Aufgabe</p>
-      <div id="gameTaskText" style="font-size:15px; line-height:1.5; min-height:60px; display:flex; align-items:center; justify-content:center;">Bereit? Tipp auf den Button!</div>
-      <button class="primary-btn" id="gameTaskBtn">🎲 Neue Aufgabe</button>
+      <p class="hint" style="margin:0 0 14px;">Drückt gleichzeitig den Button – wer zuerst dran ist, wird sofort mit jemand anderem gepaired.</p>
+      <div id="randomMatchArea" style="min-height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;">
+        <button class="primary-btn" id="randomMatchBtn">🔀 Los geht's</button>
+      </div>
     </div>
   `;
-  document.getElementById('gameTaskBtn').addEventListener('click', () => {
-    const pick = PARTY_GAME_TASKS[Math.floor(Math.random() * PARTY_GAME_TASKS.length)];
-    document.getElementById('gameTaskText').textContent = pick;
-  });
+  document.getElementById('randomMatchBtn').addEventListener('click', startRandomMatch);
+}
+
+function randomMatchIdleHtml() {
+  return '<button class="primary-btn" id="randomMatchBtn">🔀 Los geht\'s</button>';
+}
+
+async function startRandomMatch() {
+  stopRandomMatchPolling();
+  const area = document.getElementById('randomMatchArea');
+  if (!area) return;
+  area.innerHTML = '<div class="loading">Suche jemanden…</div><button class="secondary-btn" id="randomMatchCancelBtn">Abbrechen</button>';
+  document.getElementById('randomMatchCancelBtn').addEventListener('click', cancelRandomMatch);
+  try {
+    const rows = await callRpc('join_random_match', {});
+    const r = rows && rows[0];
+    if (r && !r.waiting && r.partner_id) {
+      showRandomMatchResult(r);
+    } else {
+      randomMatchTimer = setInterval(pollRandomMatch, 1800);
+    }
+  } catch (e) {
+    if (!document.getElementById('randomMatchArea')) return;
+    area.innerHTML = '<div class="err-msg">' + esc(friendlyErrorMessage(e)) + '</div>' + randomMatchIdleHtml();
+    const retryBtn = document.getElementById('randomMatchBtn');
+    if (retryBtn) retryBtn.addEventListener('click', startRandomMatch);
+  }
+}
+
+async function pollRandomMatch() {
+  const area = document.getElementById('randomMatchArea');
+  if (!area) { stopRandomMatchPolling(); return; }
+  try {
+    const rows = await callRpc('get_my_random_match', {});
+    const r = rows && rows[0];
+    if (r && r.partner_id) {
+      stopRandomMatchPolling();
+      showRandomMatchResult(r);
+    } else if (r && !r.waiting) {
+      // Expired without finding anyone.
+      stopRandomMatchPolling();
+      area.innerHTML = '<div class="empty-state" style="margin-top:0; padding:0;">Niemand gefunden 👀<br>Versucht es nochmal!</div>' + randomMatchIdleHtml();
+      document.getElementById('randomMatchBtn').addEventListener('click', startRandomMatch);
+    }
+    // else: still waiting, keep polling.
+  } catch (e) {
+    stopRandomMatchPolling();
+  }
+}
+
+function cancelRandomMatch() {
+  stopRandomMatchPolling();
+  callRpc('leave_random_match', {}).catch(() => {});
+  const area = document.getElementById('randomMatchArea');
+  if (!area) return;
+  area.innerHTML = randomMatchIdleHtml();
+  document.getElementById('randomMatchBtn').addEventListener('click', startRandomMatch);
+}
+
+function showRandomMatchResult(r) {
+  stopRandomMatchPolling();
+  const area = document.getElementById('randomMatchArea');
+  if (!area) return;
+  const avatar = avatarInner(r.partner_photo_url, esc(initials(r.partner_name)));
+  area.innerHTML = `
+    <div class="match-photo-circle" style="width:76px; height:76px; margin:0;">${avatar}</div>
+    <div style="font-size:16px; font-weight:700; line-height:1.4;">🎉 Du bist mit<br><span style="color:#ff6fa5;">${esc(r.partner_name)}</span> gepaired!</div>
+    <button class="secondary-btn" id="randomMatchAgainBtn">🔀 Neu mischen</button>
+  `;
+  document.getElementById('randomMatchAgainBtn').addEventListener('click', startRandomMatch);
 }
 </script>
 
