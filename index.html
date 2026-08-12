@@ -802,6 +802,10 @@ function nameDisplayHtml(mainName, subName) {
 }
 const ACTIVITY_EMOJI = { cocktail: '🍸 Cocktail', drink: '🍹 Drink', shot: '🥃 Shot', tanz: '💃 Tanz', flirt: '😉 Flirt', kuss: '💋 Kuss', ueberraschung: '🎁 Überraschung', afterparty: '🎉 Afterparty', sex: '🔥 S*x' };
 const INTERESTED_IN_LABEL = { frauen: 'Frauen', maenner: 'Männern', alle: 'Allen' };
+// Nominative/short forms for standalone label:value rows (profile overview),
+// as opposed to INTERESTED_IN_LABEL's dative form used mid-sentence on swipe cards.
+const GENDER_LABEL = { frau: 'Frau', mann: 'Mann', divers: 'Divers' };
+const INTERESTED_IN_SHORT_LABEL = { frauen: 'Frauen', maenner: 'Männer', alle: 'Alle' };
 const ICEBREAKER_SUGGESTIONS = [
   'Bist du ein Parkticket? Weil du "Fine" geschrieben stehst 😏',
   'Ich hab mein Herz verloren – hast du’s gesehen?',
@@ -1660,8 +1664,8 @@ function renderProfileView() {
       <h3 style="margin:0; font-size:20px;">${nameDisplayHtml(g.name, g.qr_code)}${g.age ? ' <span class="age-suffix">' + g.age + '</span>' : ''}</h3>
     </div>
     <div class="profile-card">
-      <div class="profile-row"><div class="row-label"><span class="row-icon">🧑</span>Geschlecht</div><div class="row-value">${esc(g.gender || '–')}</div></div>
-      <div class="profile-row"><div class="row-label"><span class="row-icon">💘</span>Interessiert an</div><div class="row-value">${esc(g.interested_in || '–')}</div></div>
+      <div class="profile-row"><div class="row-label"><span class="row-icon">🧑</span>Geschlecht</div><div class="row-value">${esc(GENDER_LABEL[g.gender] || g.gender || '–')}</div></div>
+      <div class="profile-row"><div class="row-label"><span class="row-icon">💘</span>Interessiert an</div><div class="row-value">${esc(INTERESTED_IN_SHORT_LABEL[g.interested_in] || g.interested_in || '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">🎯</span>Sucht</div><div class="row-value">${esc(g.looking_for ? labelFor(LOOKING_FOR_LABEL, g.looking_for) : '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">📍</span>Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
     </div>
