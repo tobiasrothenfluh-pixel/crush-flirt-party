@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>CRUSH DJ</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff3d81'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='%230a070f'/%3E%3Crect x='3' y='3' width='58' height='58' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='45' font-family='-apple-system,Helvetica,Arial,sans-serif' font-size='36' font-weight='800' fill='white' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0a0710;
+    color: #f2eef7;
+    padding: 22px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    background: linear-gradient(90deg, #ff3d81, #8b5cf6, #3d9bff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hint { font-size: 12.5px; color: #9b8fae; margin-top: 2px; }
+  .pending-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(90deg, #ff3d81, #8b5cf6);
+    color: #fff; font-weight: 800; font-size: 14px;
+    padding: 8px 16px; border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(255,61,129,0.35);
+  }
+  .pending-badge.accepted-badge {
+    background: linear-gradient(90deg, #22c55e, #4ade80);
+    box-shadow: 0 6px 18px rgba(74,222,128,0.35);
+  }
+  button {
+    padding: 10px 16px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(90deg, #ff3d81, #8b5cf6);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  button:active { transform: scale(0.96); }
+  button.secondary { background: #1c1626; color: #c9a7ff; border: 1px solid #362c47; }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  .section-title { font-size: 13px; font-weight: 700; color: #d8cfe6; text-transform: uppercase; letter-spacing: 0.05em; margin: 26px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #241d30; }
+  .section-title:first-of-type { margin-top: 0; }
+
+  .queue-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .queue-card {
+    background: #17121f;
+    border: 1px solid #2b2438;
+    border-radius: 18px;
+    padding: 18px 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    animation: cardIn 0.3s ease;
+  }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .queue-card .content { font-size: 18px; font-weight: 700; color: #fff; line-height: 1.35; margin-bottom: 10px; word-break: break-word; }
+  .queue-card .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+  .queue-card .sender { font-size: 13px; font-weight: 700; color: #c9a7ff; }
+  .queue-card .sender .crush-name { font-weight: 400; color: #695d7d; margin-left: 4px; }
+  .queue-card .time { font-size: 11.5px; color: #695d7d; flex-shrink: 0; }
+  .queue-actions { display: flex; gap: 10px; }
+  .queue-actions button { flex: 1; padding: 13px 10px; font-size: 14px; border-radius: 12px; }
+  .btn-accept { background: linear-gradient(90deg, #22c55e, #4ade80); box-shadow: 0 6px 16px rgba(74,222,128,0.3); }
+  .btn-decline { background: #1c1626; color: #ff9fc4; border: 1.5px solid #4a2f38; }
+  .btn-play { background: linear-gradient(90deg, #3d9bff, #8b5cf6); box-shadow: 0 6px 16px rgba(61,155,255,0.3); }
+
+  .queue-card.accepted-card { border-color: #2b4a38; }
+
+  .empty-queue { text-align: center; color: #9b8fae; font-size: 15px; line-height: 1.7; padding: 48px 20px; border: 1.5px dashed #2b2438; border-radius: 18px; }
+
+  .history-card { background: #17121f; border: 1px solid #2b2438; border-radius: 18px; padding: 4px 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  .history-row { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid #241d30; }
+  .history-row:last-child { border-bottom: none; }
+  .history-row .status-icon { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .history-row.played .status-icon { background: rgba(61,155,255,0.15); color: #3d9bff; }
+  .history-row.declined .status-icon { background: rgba(255,107,107,0.12); color: #ff6b6b; }
+  .history-row.accepted .status-icon { background: rgba(74,222,128,0.15); color: #4ade80; }
+  .history-row .body { flex: 1; min-width: 0; }
+  .history-row .content { font-size: 14.5px; font-weight: 700; color: #f2eef7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-row .who { font-size: 12px; color: #9b8fae; margin-top: 2px; }
+  .history-row .time { font-size: 11.5px; color: #695d7d; flex-shrink: 0; text-align: right; }
+
+  .muted { color: #9b8fae; font-size: 13.5px; }
+  .err { color: #ff6b6b; }
+
+  label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #9b8fae; display: block; margin-bottom: 4px; }
+  input[type=text], input[type=password] {
+    width: 100%;
+    font-size: 14px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #362c47;
+    background: #1c1626;
+    color: #f2eef7;
+  }
+  input::placeholder { color: #695d7d; }
+  .dj-profile-card { background: #17121f; border: 1px solid #2b2438; border-radius: 16px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+  .dj-profile-card > div.field { flex: 1; min-width: 160px; }
+  .dj-profile-card button { flex-shrink: 0; }
+  .dj-saved-hint { font-size: 12px; color: #4ade80; margin-top: 8px; min-height: 16px; }
+  .dj-status-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #17121f; border: 1px solid #2b2438; border-radius: 16px; padding: 14px 20px; margin-bottom: 16px; }
+  .dj-status-bar.paused { border-color: #4a2f38; background: linear-gradient(180deg, rgba(255,107,107,0.07), #17121f); }
+  .dj-status-text { font-size: 14px; font-weight: 800; color: #4ade80; }
+  .dj-status-bar.paused .dj-status-text { color: #ff9fc4; }
+  .dj-status-sub { font-size: 12px; color: #9b8fae; margin-top: 2px; }
+  #djPauseBtn.is-paused { background: linear-gradient(90deg, #22c55e, #4ade80); }
+
+  .gate-wrap { min-height: 90vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .gate-card { max-width: 340px; width: 100%; }
+  .gate-card input { text-align: center; font-size: 16px; letter-spacing: 0.05em; margin-top: 6px; }
+  .gate-card button { width: 100%; margin-top: 14px; padding: 13px; font-size: 15px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="gateScreen" class="gate-wrap">
+  <div class="gate-card">
+    <h1 style="font-size:32px;">🎧 CRUSH DJ</h1>
+    <div class="hint" style="margin-bottom:18px;">Gib den DJ-Code ein, den du vom Team bekommen hast.</div>
+    <label for="djCodeInput">DJ-Code</label>
+    <input id="djCodeInput" type="password" placeholder="z.B. CRUSH-DJ-2026">
+    <div class="err" id="gateErr" style="margin-top:8px; min-height:16px;"></div>
+    <button id="gateBtn">Freischalten</button>
+  </div>
+</div>
+
+<div id="djScreen" class="hidden">
+  <div class="topbar">
+    <div>
+      <h1>🎧 CRUSH DJ</h1>
+      <div class="hint">Live-Musikwünsche der Party – annehmen oder ablehnen</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="pending-badge">🎵 <span id="pendingCount">0</span> offen</div>
+      <div class="pending-badge accepted-badge">🎶 <span id="acceptedCount">0</span> wartet auf Play</div>
+      <button class="secondary" id="refreshBtn">🔄</button>
+    </div>
+  </div>
+
+  <div class="dj-status-bar" id="djStatusBar">
+    <div>
+      <div class="dj-status-text" id="djStatusText">🟢 Nimmt Musikwünsche an</div>
+      <div class="dj-status-sub" id="djStatusSub">Gäste können gerade neue Wünsche einreichen.</div>
+    </div>
+    <button class="secondary" id="djPauseBtn">⏸ Pause einlegen</button>
+  </div>
+
+  <div class="dj-profile-card">
+    <div class="field">
+      <label for="djNameInput">DJ-Name (für die Gäste sichtbar)</label>
+      <input id="djNameInput" type="text" placeholder="z.B. DJ Wildis">
+    </div>
+    <div class="field">
+      <label for="djInstaInput">Instagram</label>
+      <input id="djInstaInput" type="text" placeholder="@handle">
+    </div>
+    <button id="djSaveBtn">Speichern</button>
+    <div class="dj-saved-hint" id="djSavedHint" style="flex-basis:100%;"></div>
+  </div>
+
+  <div class="section-title">Warteschlange</div>
+  <div id="queueArea"><div class="muted">Lade…</div></div>
+
+  <div class="section-title">Angenommen – wartet auf Play</div>
+  <div id="acceptedArea"><div class="muted">Lade…</div></div>
+
+  <div class="section-title">Verlauf (letzte 20 Entscheidungen)</div>
+  <div id="historyArea"><div class="muted">Lade…</div></div>
+
+  <div style="text-align:center; margin-top:26px;">
+    <span id="logoutLink" style="font-size:12px; color:#695d7d; cursor:pointer;">Anderer Code / Ausloggen</span>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://nvgohjfbzupukcguxnpy.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_k374bKklKAN4V88XEwjE3g_bG_R4JWZ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function callRpc(name, args, attempt) {
+  attempt = attempt || 0;
+  let data, error;
+  try {
+    ({ data, error } = await sb.rpc(name, args || {}));
+  } catch (networkErr) {
+    if (attempt < 2) { await sleep(600 * (attempt + 1)); return callRpc(name, args, attempt + 1); }
+    throw new Error('network_error');
+  }
+  if (error) {
+    if (attempt < 2 && /fetch|network|Failed to fetch/i.test(error.message || '')) {
+      await sleep(600 * (attempt + 1));
+      return callRpc(name, args, attempt + 1);
+    }
+    throw new Error(error.message || error.code || 'unbekannter Fehler');
+  }
+  return data;
+}
+
+function formatRelativeTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 1) return 'jetzt';
+  if (min < 60) return 'vor ' + min + ' Min';
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return 'vor ' + hrs + ' Std';
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+}
+
+function normalizeInstagramHandle(input) {
+  return String(input || '').trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
+}
+
+let eventId = null;
+let djCode = null;
+const DJ_CODE_KEY = 'crush_dj_code';
+
+async function getActiveEventId() {
+  const { data, error } = await sb.from('events').select('id, dj_name, dj_instagram, dj_accepting_requests').eq('status', 'checkin_open').order('event_date', { ascending: true }).limit(1);
+  if (error) throw new Error(error.message);
+  return (data && data[0]) || null;
+}
+
+async function tryUnlock(code) {
+  const ev = await getActiveEventId();
+  if (!ev) throw new Error('no_active_event');
+  const ok = await callRpc('dj_verify_code', { p_event_id: ev.id, p_code: code });
+  if (!ok) throw new Error('invalid_dj_code');
+  eventId = ev.id;
+  djCode = code;
+  document.getElementById('djNameInput').value = ev.dj_name || '';
+  document.getElementById('djInstaInput').value = ev.dj_instagram || '';
+  renderStatusBar(ev.dj_accepting_requests !== false);
+  localStorage.setItem(DJ_CODE_KEY, code);
+  document.getElementById('gateScreen').classList.add('hidden');
+  document.getElementById('djScreen').classList.remove('hidden');
+  loadAll();
+  setInterval(loadAll, 6000);
+}
+
+document.getElementById('gateBtn').addEventListener('click', async () => {
+  const code = document.getElementById('djCodeInput').value.trim();
+  const errEl = document.getElementById('gateErr');
+  errEl.textContent = '';
+  if (!code) { errEl.textContent = 'Bitte Code eingeben.'; return; }
+  const btn = document.getElementById('gateBtn');
+  btn.disabled = true;
+  try {
+    await tryUnlock(code);
+  } catch (e) {
+    errEl.textContent = e.message === 'no_active_event' ? 'Aktuell ist kein Event offen.' :
+      e.message === 'invalid_dj_code' ? 'Falscher Code. Bitte beim Team nachfragen.' :
+      'Kurzer Aussetzer – bitte nochmal versuchen.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+document.getElementById('djCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('gateBtn').click(); });
+
+document.getElementById('logoutLink').addEventListener('click', () => {
+  localStorage.removeItem(DJ_CODE_KEY);
+  location.reload();
+});
+
+function renderStatusBar(accepting) {
+  const bar = document.getElementById('djStatusBar');
+  const text = document.getElementById('djStatusText');
+  const sub = document.getElementById('djStatusSub');
+  const btn = document.getElementById('djPauseBtn');
+  bar.classList.toggle('paused', !accepting);
+  btn.classList.toggle('is-paused', !accepting);
+  if (accepting) {
+    text.textContent = '🟢 Nimmt Musikwünsche an';
+    sub.textContent = 'Gäste können gerade neue Wünsche einreichen.';
+    btn.textContent = '⏸ Pause einlegen';
+  } else {
+    text.textContent = '⏸️ Pausiert';
+    sub.textContent = 'Gäste sehen gerade, dass keine neuen Wünsche angenommen werden.';
+    btn.textContent = '▶️ Wieder annehmen';
+  }
+}
+
+document.getElementById('djPauseBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('djPauseBtn');
+  const nowPaused = !btn.classList.contains('is-paused');
+  btn.disabled = true;
+  try {
+    const accepting = await callRpc('dj_set_accepting', { p_event_id: eventId, p_code: djCode, p_accepting: !nowPaused ? true : false });
+    renderStatusBar(accepting);
+  } catch (e) {
+    alert('Fehler: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('djSaveBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('djSaveBtn');
+  const hint = document.getElementById('djSavedHint');
+  const name = document.getElementById('djNameInput').value.trim();
+  const insta = normalizeInstagramHandle(document.getElementById('djInstaInput').value);
+  btn.disabled = true;
+  hint.textContent = '';
+  try {
+    await callRpc('dj_update_profile', { p_event_id: eventId, p_code: djCode, p_dj_name: name || null, p_dj_instagram: insta || null });
+    hint.textContent = '✅ Gespeichert';
+    setTimeout(() => { hint.textContent = ''; }, 3000);
+  } catch (e) {
+    hint.style.color = '#ff6b6b';
+    hint.textContent = 'Fehler beim Speichern.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+let allSongs = [];
+async function loadAll() {
+  try {
+    allSongs = await callRpc('dj_list_songs', { p_event_id: eventId, p_code: djCode });
+    renderQueue();
+    renderAccepted();
+    renderHistory();
+  } catch (e) {
+    console.error(e);
+  }
+}
+document.getElementById('refreshBtn').addEventListener('click', loadAll);
+
+async function setStatus(id, status) {
+  try {
+    await callRpc('dj_set_song_status', { p_event_id: eventId, p_code: djCode, p_extra_id: id, p_status: status });
+    await loadAll();
+  } catch (e) {
+    alert('Fehler: ' + (e.message || e));
+  }
+}
+
+function renderQueue() {
+  const el = document.getElementById('queueArea');
+  const pending = allSongs.filter(s => s.status === 'pending');
+  document.getElementById('pendingCount').textContent = pending.length;
+  if (!pending.length) { el.innerHTML = '<div class="empty-queue">🎶 Keine offenen Musikwünsche gerade.</div>'; return; }
+  el.innerHTML = '<div class="queue-grid">' + pending.map(s => `
+    <div class="queue-card">
+      <div class="content">🎵 ${esc(s.content)}</div>
+      <div class="meta">
+        <div class="sender">${esc(s.guest_name || 'Gast')}<span class="crush-name">${esc(s.guest_qr || '')}</span></div>
+        <div class="time">${formatRelativeTime(s.created_at)}</div>
+      </div>
+      <div class="queue-actions">
+        <button class="btn-accept" data-id="${s.id}" data-action="accepted">✓ Annehmen</button>
+        <button class="btn-decline" data-id="${s.id}" data-action="declined">✕ Ablehnen</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+  el.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => setStatus(btn.dataset.id, btn.dataset.action));
+  });
+}
+
+function renderAccepted() {
+  const el = document.getElementById('acceptedArea');
+  const accepted = allSongs.filter(s => s.status === 'accepted');
+  document.getElementById('acceptedCount').textContent = accepted.length;
+  if (!accepted.length) { el.innerHTML = '<div class="empty-queue">Noch nichts angenommen.</div>'; return; }
+  el.innerHTML = '<div class="queue-grid">' + accepted.map(s => `
+    <div class="queue-card accepted-card">
+      <div class="content">🎵 ${esc(s.content)}</div>
+      <div class="meta">
+        <div class="sender">${esc(s.guest_name || 'Gast')}<span class="crush-name">${esc(s.guest_qr || '')}</span></div>
+        <div class="time">${formatRelativeTime(s.decided_at || s.created_at)}</div>
+      </div>
+      <div class="queue-actions">
+        <button class="btn-play" data-id="${s.id}" data-action="played">▶️ Gespielt</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+  el.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => setStatus(btn.dataset.id, btn.dataset.action));
+  });
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyArea');
+  const history = allSongs
+    .filter(s => s.status === 'played' || s.status === 'declined')
+    .sort((a, b) => new Date(b.played_at || b.decided_at || b.created_at) - new Date(a.played_at || a.decided_at || a.created_at))
+    .slice(0, 20);
+  if (!history.length) { el.innerHTML = '<div class="empty-queue">Noch keine Entscheidungen.</div>'; return; }
+  el.innerHTML = '<div class="history-card">' + history.map(s => {
+    const icon = s.status === 'played' ? '▶️' : '✕';
+    const label = s.status === 'played' ? 'Gespielt' : 'Abgelehnt';
+    const timeSrc = s.status === 'played' ? s.played_at : (s.decided_at || s.created_at);
+    return `
+    <div class="history-row ${s.status}">
+      <div class="status-icon">${icon}</div>
+      <div class="body">
+        <div class="content">${esc(s.content)}</div>
+        <div class="who">${esc(s.guest_name || 'Gast')} · ${label}</div>
+      </div>
+      <div class="time">${formatRelativeTime(timeSrc)}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+(function init() {
+  const saved = localStorage.getItem(DJ_CODE_KEY);
+  if (saved) {
+    document.getElementById('djCodeInput').value = saved;
+    tryUnlock(saved).catch(() => { localStorage.removeItem(DJ_CODE_KEY); });
+  }
+})();
+</script>
+
+</body>
+</html>
