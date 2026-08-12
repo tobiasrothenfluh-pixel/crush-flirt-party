@@ -808,9 +808,27 @@ async function ensureSession() {
 // Calls a Postgres RPC function and unwraps { data, error } into a plain
 // throw-on-error result. TABLE-returning functions come back as an array;
 // scalar/void ones come back as whatever PostgREST gives (often null).
-async function callRpc(name, args) {
-  const { data, error } = await sb.rpc(name, args || {});
-  if (error) throw new Error(error.message || error.code || 'unbekannter Fehler');
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// On flaky venue WiFi, a "TypeError: Failed to fetch"-style network error is far more
+// common than an actual backend/validation error. Retry those once (short backoff)
+// before surfacing "Kurzer Aussetzer" — real errors from the DB (e.g. a raised
+// exception) come back as a normal Postgrest error, not a fetch failure, so they
+// still fail fast without a pointless retry.
+async function callRpc(name, args, _retried) {
+  let data, error;
+  try {
+    ({ data, error } = await sb.rpc(name, args || {}));
+  } catch (networkErr) {
+    if (!_retried) { await sleep(900); return callRpc(name, args, true); }
+    throw new Error('network_error');
+  }
+  if (error) {
+    if (!_retried && /fetch|network|Failed to fetch/i.test(error.message || '')) {
+      await sleep(900);
+      return callRpc(name, args, true);
+    }
+    throw new Error(error.message || error.code || 'unbekannter Fehler');
+  }
   return data;
 }
 
@@ -1505,7 +1523,7 @@ async function loadProfile() {
     if (error) throw new Error(error.message);
     if (!rows.length) { el.innerHTML = '<div class="empty-state">Kein Profil gefunden.</div>'; return; }
     currentProfile = rows[0];
-    renderProfileView();
+    renderProfileEdit();
   } catch (e) {
     renderFriendlyError(el, e, loadProfile, 'retryProfile');
   }
@@ -1589,7 +1607,7 @@ function renderProfileEdit() {
       </div>
     </div>
     <label for="editAge">Alter</label>
-    <input id="editAge" type="number" min="18" max="99" value="${g.age ?? ''}">
+    <input id="editAge" type="number" min="18" max="99" value="${g.age ?? ''}" style="max-width:110px;">
     <label for="editLookingFor">Sucht nach</label>
     <select id="editLookingFor">
       <option value="offen" ${g.looking_for==='offen'?'selected':''}>Offen</option>
@@ -1601,7 +1619,7 @@ function renderProfileEdit() {
       <option value="tanzpartner" ${g.looking_for==='tanzpartner'?'selected':''}>Tanzpartner für heute 💃</option>
     </select>
     <label for="editLocation">Wohnort</label>
-    <input id="editLocation" type="text" value="${esc(g.home_location || '')}" placeholder="z.B. Zürich">
+    <input id="editLocation" type="text" value="${esc(g.home_location || '')}">
     <label>Profilbild</label>
     <div class="avatar-picker">
       <div id="photoPreviewWrap" class="avatar-picker-preview">${renderPhotoPreviewInner(g.photo_url)}</div>
@@ -1618,8 +1636,6 @@ function renderProfileEdit() {
     ${chipRowHtml('editInterestsChips', INTEREST_EMOJI, activeInterests, { allowCustom: true })}
     <label>Musik</label>
     ${chipRowHtml('editMusicChips', MUSIC_EMOJI, activeMusic, { allowCustom: true })}
-    <label>Getränke</label>
-    ${chipRowHtml('editDrinksChips', DRINK_EMOJI, activeDrinks, { allowCustom: true })}
     <label>Interessiert an einem…</label>
     ${chipRowHtml('editActivityChips', ACTIVITY_EMOJI, activeActivities)}
     <div id="editAgeErr" class="err-msg"></div>
@@ -1629,7 +1645,6 @@ function renderProfileEdit() {
   `;
   wireChipRow('editInterestsChips', activeInterests);
   wireChipRow('editMusicChips', activeMusic);
-  wireChipRow('editDrinksChips', activeDrinks);
   wireChipRow('editActivityChips', activeActivities);
 
   let pendingPhotoDataUrl = null;
@@ -1637,7 +1652,7 @@ function renderProfileEdit() {
   // Shared render for the small profile-picture preview slot: real photo, emoji-as-avatar, or empty placeholder.
   function renderPhotoPreviewInner(photoUrl) {
     if (photoUrl && photoUrl.indexOf('emoji:') === 0) {
-      return '<div class="photo-preview-empty" style="font-size:28px;">' + esc(photoUrl.slice(6)) + '</div>';
+      return '<div class="photo-preview-empty" style="font-size:46px; border-style:solid;">' + esc(photoUrl.slice(6)) + '</div>';
     }
     if (photoUrl) {
       return '<img class="photo-preview" src="' + esc(photoUrl) + '">';
@@ -1705,7 +1720,7 @@ function renderProfileEdit() {
     }
   });
 
-  document.getElementById('cancelEditBtn').addEventListener('click', renderProfileView);
+  document.getElementById('cancelEditBtn').addEventListener('click', renderProfileEdit);
   document.getElementById('saveProfileBtn').addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
     if (btn.disabled) return;
@@ -1729,7 +1744,8 @@ function renderProfileEdit() {
         p_photo_url: (photoChanged && pendingPhotoDataUrl) ? pendingPhotoDataUrl : null
       });
       currentProfile = rows[0];
-      renderProfileView();
+      renderProfileEdit();
+      showToast('✅ Profil gespeichert');
     } catch (e) {
       errEl.textContent = friendlyErrorMessage(e);
       btn.disabled = false;
