@@ -1069,8 +1069,9 @@ async function doSwipe(response) {
   const icebreakerArg = (response === 'crush' && combinedMsg) ? combinedMsg : null;
   try {
     const rows = await callRpc('crush_swipe', { p_target_guest_id: currentCandidate.id, p_response: response, p_icebreaker: icebreakerArg });
-    const m = rows[0];
-    if (m.mutual) {
+    // A 'pass' (No) swipe returns no row — only 'crush' swipes ever produce a match record.
+    const m = rows && rows[0];
+    if (m && m.mutual) {
       const seen = getSeenMatches();
       seen.add(m.id);
       saveSeenMatches(seen);
