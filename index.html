@@ -592,6 +592,38 @@
     cursor: pointer;
   }
   .crush-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+  /* Styled confirm modal — replaces native confirm() so it matches the app design */
+  .confirm-overlay {
+    position: absolute; inset: 0;
+    background: rgba(5,3,9,0.72);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 60;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease;
+    padding: 24px;
+  }
+  .confirm-overlay.show { opacity: 1; pointer-events: auto; }
+  .confirm-card {
+    width: 100%; max-width: 300px;
+    background: #17121f;
+    border: 1px solid #2b2438;
+    border-radius: 20px;
+    padding: 22px 20px 18px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    transform: scale(0.92) translateY(6px);
+    transition: transform 0.18s ease;
+  }
+  .confirm-overlay.show .confirm-card { transform: scale(1) translateY(0); }
+  .confirm-card p { margin: 0 0 20px; font-size: 14.5px; line-height: 1.6; color: #f2eef7; }
+  .confirm-card .confirm-actions { display: flex; gap: 10px; }
+  .confirm-card .confirm-actions button { flex: 1; margin-top: 0; padding: 11px; font-size: 14px; border-radius: 12px; }
+  .confirm-card .confirm-cancel {
+    background: #1c1626; color: #c9a7ff; border: 1px solid #362c47;
+    font-weight: 700; cursor: pointer;
+  }
+  .confirm-card .confirm-ok.danger { background: linear-gradient(90deg, #ff3d3d, #ff6b6b); box-shadow: 0 6px 16px rgba(255,61,61,0.3); }
 </style>
 </head>
 <body>
@@ -599,6 +631,16 @@
 <div class="phone">
   <div class="notch"></div>
   <div class="crush-toast" id="crushToast"><span id="crushToastText"></span></div>
+
+  <div class="confirm-overlay" id="confirmOverlay">
+    <div class="confirm-card">
+      <p id="confirmMessage"></p>
+      <div class="confirm-actions">
+        <button class="confirm-cancel" id="confirmCancelBtn">Abbrechen</button>
+        <button class="primary-btn confirm-ok" id="confirmOkBtn" style="margin-top:0;">OK</button>
+      </div>
+    </div>
+  </div>
 
   <div class="screen" id="loginScreen">
     <div class="brandbar">CRUSH</div>
@@ -1209,6 +1251,36 @@ document.getElementById('crushToast').addEventListener('click', () => {
   document.getElementById('crushToast').classList.remove('show');
   if (toastClickHandler) toastClickHandler();
 });
+
+// Styled in-app replacement for window.confirm() — resolves true/false like
+// the native dialog, but matches the app's dark/gradient design instead of
+// popping the browser's default system alert.
+function showConfirmModal(message, opts) {
+  opts = opts || {};
+  const overlay = document.getElementById('confirmOverlay');
+  const okBtn = document.getElementById('confirmOkBtn');
+  const cancelBtn = document.getElementById('confirmCancelBtn');
+  document.getElementById('confirmMessage').textContent = message;
+  okBtn.textContent = opts.okText || 'OK';
+  cancelBtn.textContent = opts.cancelText || 'Abbrechen';
+  okBtn.classList.toggle('danger', !!opts.danger);
+  return new Promise((resolve) => {
+    function cleanup(result) {
+      overlay.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlay);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    function onOverlay(e) { if (e.target === overlay) cleanup(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlay);
+    overlay.classList.add('show');
+  });
+}
 function showCrushToast(label) {
   feedbackMatch();
   showToast('🎉 Neuer Crush mit ' + label + '!', () => showTab('matches'));
@@ -1402,13 +1474,13 @@ async function loadMatches() {
         const partnerId = row.dataset.partnerId;
         const partnerName = row.dataset.partnerName;
         if (btn.dataset.action === 'unmatch') {
-          if (!confirm(partnerName + ' aus deinen Crushes entfernen? Der Chat-Verlauf geht verloren.')) return;
+          if (!(await showConfirmModal(partnerName + ' aus deinen Crushes entfernen? Der Chat-Verlauf geht verloren.', { okText: 'Entfernen', danger: true }))) return;
           await guardClick(btn, async () => {
             await callRpc('unmatch', { p_match_id: matchId });
             await loadMatches();
           });
         } else if (btn.dataset.action === 'block') {
-          if (!confirm(partnerName + ' blockieren? Ihr seht euch danach gegenseitig nicht mehr.')) return;
+          if (!(await showConfirmModal(partnerName + ' blockieren? Ihr seht euch danach gegenseitig nicht mehr.', { okText: 'Blockieren', danger: true }))) return;
           await guardClick(btn, async () => {
             await callRpc('block_guest', { p_target_guest_id: partnerId });
             await loadMatches();
@@ -1493,7 +1565,7 @@ document.querySelectorAll('#chatActionsPanel .match-action-btn').forEach(btn => 
   btn.addEventListener('click', async () => {
     if (!currentMatchId) return;
     if (btn.dataset.action === 'unmatch') {
-      if (!confirm('Aus deinen Crushes entfernen? Der Chat-Verlauf geht verloren.')) return;
+      if (!(await showConfirmModal('Aus deinen Crushes entfernen? Der Chat-Verlauf geht verloren.', { okText: 'Entfernen', danger: true }))) return;
       await guardClick(btn, async () => {
         await callRpc('unmatch', { p_match_id: currentMatchId });
         showTab('matches');
@@ -1501,7 +1573,7 @@ document.querySelectorAll('#chatActionsPanel .match-action-btn').forEach(btn => 
       });
     } else if (btn.dataset.action === 'block') {
       if (!currentPartnerId) return;
-      if (!confirm('Diese Person blockieren? Ihr seht euch danach gegenseitig nicht mehr.')) return;
+      if (!(await showConfirmModal('Diese Person blockieren? Ihr seht euch danach gegenseitig nicht mehr.', { okText: 'Blockieren', danger: true }))) return;
       await guardClick(btn, async () => {
         await callRpc('block_guest', { p_target_guest_id: currentPartnerId });
         showTab('matches');
@@ -1775,7 +1847,7 @@ function renderProfileEdit() {
   document.getElementById('checkoutBtn2').addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
     if (btn.disabled) return;
-    if (!confirm('Wirklich auschecken? Du wirst vom Event abgemeldet.')) return;
+    if (!(await showConfirmModal('Wirklich auschecken? Du wirst vom Event abgemeldet.', { okText: 'Auschecken', danger: true }))) return;
     btn.disabled = true;
     try {
       await callRpc('self_checkout', {});
