@@ -1924,7 +1924,7 @@ function renderProfileEdit() {
 }
 
 // ---------- Extras (Bonus-Bereich, passwortgeschützt) ----------
-let extrasUnlocked = false;
+const EXTRAS_REQUIRE_PASSWORD = false; let extrasUnlocked = !EXTRAS_REQUIRE_PASSWORD;
 let extrasSubtab = 'shoutout';
 async function renderExtras() {
   const area = document.getElementById('extrasArea');
