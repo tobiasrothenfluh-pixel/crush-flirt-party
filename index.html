@@ -193,6 +193,41 @@
   .tag { display: inline-block; background: #241d30; color: #c9a7ff; font-size: 11px; padding: 3px 9px; border-radius: 999px; margin: 0 5px 5px 0; }
   .tag.activity { background: linear-gradient(90deg, #ff3d81, #8b5cf6); color: #fff; font-weight: 700; }
   .icebreaker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #c9a7ff; margin: 8px 0 4px; }
+  .live-guest-counter {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 12.5px; font-weight: 600; color: #9ee6ad;
+    background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.25);
+    border-radius: 999px; padding: 6px 14px; margin: 4px auto 10px; width: fit-content;
+  }
+  .live-guest-counter strong { color: #fff; }
+  .random-match-pulse {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, #ff3d81, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; position: relative;
+    animation: rmPulseCore 1.6s ease-in-out infinite;
+  }
+  .random-match-pulse::before, .random-match-pulse::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    border: 2px solid rgba(255,61,129,0.55);
+    animation: rmPulseRing 1.6s ease-out infinite;
+  }
+  .random-match-pulse::after { animation-delay: 0.55s; }
+  @keyframes rmPulseCore { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+  @keyframes rmPulseRing { 0% { transform: scale(1); opacity: 0.75; } 100% { transform: scale(2.3); opacity: 0; } }
+  .random-match-waiting-text { font-size: 14.5px; font-weight: 700; color: #f2eef7; margin-top: 2px; }
+  .random-match-seconds { font-size: 12px; color: #9b8fae; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .a2hs-banner {
+    display: flex; align-items: center; gap: 10px;
+    background: linear-gradient(90deg, rgba(255,61,129,0.12), rgba(139,92,246,0.12));
+    border-bottom: 1px solid #2b2438;
+    padding: 9px 14px; font-size: 12.5px; color: #d8cfe6; line-height: 1.35;
+  }
+  .a2hs-banner-action {
+    flex-shrink: 0; padding: 6px 12px; font-size: 12.5px; font-weight: 700; color: #fff;
+    background: linear-gradient(90deg, #ff3d81, #8b5cf6); border: none; border-radius: 8px; cursor: pointer;
+  }
+  .a2hs-banner-close { flex-shrink: 0; color: #9b8fae; font-size: 14px; cursor: pointer; padding: 2px 4px; }
   .swipe-actions { display: flex; gap: 12px; margin-top: 16px; }
   .swipe-actions button {
     flex: 1;
@@ -381,6 +416,13 @@
   }
   .bubble-row.me .bubble { background: linear-gradient(90deg, #ff3d81, #8b5cf6); color: #fff; border-bottom-right-radius: 4px; }
   .bubble-row.them .bubble { background: #241d30; color: #f2eef7; border-bottom-left-radius: 4px; }
+  .bubble-row.them { align-items: flex-end; gap: 4px; }
+  .msg-report-btn {
+    flex-shrink: 0; align-self: flex-end; margin-bottom: 3px;
+    font-size: 12px; opacity: 0.35; cursor: pointer; padding: 4px; line-height: 1;
+  }
+  .msg-report-btn:active { opacity: 1; transform: scale(1.15); }
+  .msg-report-btn.reported { opacity: 0.9; }
   .chat-input-row { display: flex; gap: 8px; padding: 10px 16px 16px; border-top: 1px solid #241d30; }
   .chat-input-row input { flex: 1; margin: 0; }
   .chat-input-row button {
@@ -669,8 +711,14 @@
 
   <div class="screen hidden" id="mainScreen">
     <div class="brandbar" id="mainTitle">CRUSH</div>
+    <div id="a2hsBanner" class="a2hs-banner hidden">
+      <span id="a2hsBannerText" style="flex:1;"></span>
+      <button type="button" id="a2hsBannerAction" class="a2hs-banner-action hidden">Installieren</button>
+      <span id="a2hsBannerClose" class="a2hs-banner-close" role="button" aria-label="Schließen">✕</span>
+    </div>
 
     <div class="content" id="tab-swipe">
+      <div id="liveGuestCounter" class="live-guest-counter hidden"></div>
       <div id="swipeArea"><div class="loading">Lade…</div></div>
     </div>
 
@@ -727,6 +775,15 @@ const SUPABASE_URL = 'https://nvgohjfbzupukcguxnpy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_k374bKklKAN4V88XEwjE3g_bG_R4JWZ';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true }
+});
+
+// ---------- "Zum Homescreen hinzufügen" ----------
+// Must be registered early (before any user gesture) so the browser's native
+// install prompt, if it fires, is captured instead of lost.
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
 });
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -832,7 +889,21 @@ const ICEBREAKER_SUGGESTIONS = [
   'Lust, den Rest vom Abend zusammen zu verbringen?',
   'Du siehst aus, als hättest du die beste Geschichte des Abends auf Lager.',
   'Kurze Frage: Tanzpartner für den nächsten Song gesucht?',
-  'Okay, offiziell: du bist grad der interessanteste Mensch hier im Raum.'
+  'Okay, offiziell: du bist grad der interessanteste Mensch hier im Raum.',
+  'Wenn das hier ein Film wäre, wärst du eindeutig die beste Besetzung.',
+  'Ich behaupte einfach mal: wir hätten gute Chemie.',
+  'Dein Lächeln hat mich grad zwei Sätze vergessen lassen.',
+  'Ich glaub, ich brauch noch eine Ausrede, um länger hier zu bleiben – bist du eine?',
+  'Ganz ehrlich, ich beobachte dich jetzt schon länger als es cool wirkt.',
+  'Wetten, wir tanzen besser zusammen als jede Playlist hier?',
+  'Du oder die Musik – ich glaub du gewinnst grad.',
+  'Kleine Challenge: Überrasch mich mit deiner besten Anmachformel.',
+  'Ich sammle heute Abend Geschichten – deine will ich unbedingt hören.',
+  'Sag nicht Nein, bevor du nicht meinen Charme getestet hast.',
+  'Ich glaub, das hier ist der Moment, an dem der Abend besser wird.',
+  'Kurz und ehrlich: Ich wollte einfach einen Grund haben, dir zu schreiben.',
+  'Du siehst aus wie jemand, der gute Musik UND gute Gespräche mag.',
+  'Letzte Warnung: Wenn du antwortest, flirte ich schamlos weiter.'
 ];
 const INTEREST_EMOJI = { reisen: '🌍 Reisen', sport: '⚽ Sport', kochen: '🍳 Kochen', kunst: '🎨 Kunst', fotografie: '📸 Fotografie', gaming: '🎮 Gaming', lesen: '📚 Lesen', fitness: '💪 Fitness', film: '🎬 Film', natur: '🌿 Natur' };
 const MUSIC_EMOJI = { techno: '🎧 Techno', house: '🏠 House', hiphop: '🎤 HipHop', pop: '🎵 Pop', rock: '🎸 Rock', indie: '🎹 Indie', rnb: '🎷 R&B', edm: '🪩 EDM' };
@@ -1021,6 +1092,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     const isNew = rows[0] && rows[0].is_new;
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainScreen').classList.remove('hidden');
+    maybeShowA2HSBanner();
     await seedSeenMatches();
     await seedSeenSongStatus();
     if (isNew) {
@@ -1043,7 +1115,7 @@ async function showTab(tab) {
   });
   document.getElementById('chatInputRow').classList.toggle('hidden', tab !== 'chat');
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.remove('active'));
-  if (tab === 'swipe') { document.querySelector('#tabbar button[data-tab="swipe"]').classList.add('active'); await loadNextCandidate(); }
+  if (tab === 'swipe') { document.querySelector('#tabbar button[data-tab="swipe"]').classList.add('active'); await loadNextCandidate(); updateLiveGuestCount(); }
   if (tab === 'matches') { document.querySelector('#tabbar button[data-tab="matches"]').classList.add('active'); await loadMatches(); }
   if (tab === 'profile') { document.querySelector('#tabbar button[data-tab="profile"]').classList.add('active'); await loadProfile(); }
   if (tab === 'extras') { document.querySelector('#tabbar button[data-tab="extras"]').classList.add('active'); await renderExtras(); }
@@ -1326,6 +1398,72 @@ async function pollForNewCrushes() {
   } catch (e) {}
 }
 setInterval(pollForNewCrushes, 15000);
+
+// ---------- Live-Zähler: eingecheckte Gäste ----------
+async function updateLiveGuestCount() {
+  const el = document.getElementById('liveGuestCounter');
+  if (!el) return;
+  if (document.hidden) return;
+  if (document.getElementById('mainScreen').classList.contains('hidden')) return;
+  try {
+    const count = await callRpc('get_active_guest_count', {});
+    const n = typeof count === 'number' ? count : parseInt(count, 10) || 0;
+    el.innerHTML = '🟢 <strong>' + n + '</strong> ' + (n === 1 ? 'Person gerade da' : 'Leute gerade da');
+    el.classList.remove('hidden');
+  } catch (e) {
+    el.classList.add('hidden');
+  }
+}
+setInterval(updateLiveGuestCount, 20000);
+
+// ---------- "Zum Homescreen hinzufügen" Banner ----------
+const A2HS_DISMISSED_KEY = 'crush_a2hs_dismissed';
+function isStandaloneDisplay() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function maybeShowA2HSBanner() {
+  const banner = document.getElementById('a2hsBanner');
+  if (!banner) return;
+  if (isStandaloneDisplay()) return; // already installed/running as an app
+  if (localStorage.getItem(A2HS_DISMISSED_KEY)) return;
+
+  const ua = window.navigator.userAgent || '';
+  const isIOS = /iP(hone|od|ad)/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(ua);
+  const textEl = document.getElementById('a2hsBannerText');
+  const actionBtn = document.getElementById('a2hsBannerAction');
+
+  if (deferredInstallPrompt) {
+    // Chrome/Android (or any browser supporting the native install prompt).
+    textEl.textContent = '📲 CRUSH zum Startbildschirm hinzufügen für schnelleren Zugriff.';
+    actionBtn.classList.remove('hidden');
+    actionBtn.textContent = 'Installieren';
+    actionBtn.onclick = async () => {
+      banner.classList.add('hidden');
+      try {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+      } catch (e) {}
+      deferredInstallPrompt = null;
+      localStorage.setItem(A2HS_DISMISSED_KEY, '1');
+    };
+  } else if (isIOS) {
+    textEl.textContent = '📲 Zum Home-Bildschirm hinzufügen: Teilen-Symbol ⬆️ → „Zum Home-Bildschirm“.';
+    actionBtn.classList.add('hidden');
+  } else if (isAndroid) {
+    textEl.textContent = '📲 Zum Startbildschirm hinzufügen: Menü ⋮ → „App installieren“.';
+    actionBtn.classList.add('hidden');
+  } else {
+    // Desktop or unsupported browser — not worth showing.
+    return;
+  }
+
+  banner.classList.remove('hidden');
+  document.getElementById('a2hsBannerClose').addEventListener('click', () => {
+    banner.classList.add('hidden');
+    localStorage.setItem(A2HS_DISMISSED_KEY, '1');
+  }, { once: true });
+}
 
 // ---------- Song-Wunsch-Benachrichtigung ----------
 // Notifies the guest as soon as the DJ accepts/declines a song request they
@@ -1619,9 +1757,26 @@ async function loadChatMessages() {
       return;
     }
     el.innerHTML = rows.map(m =>
-      '<div class="bubble-row ' + (m.is_me ? 'me' : 'them') + '"><div class="bubble">' + esc(m.content) + '</div></div>'
+      '<div class="bubble-row ' + (m.is_me ? 'me' : 'them') + '">' +
+        '<div class="bubble">' + esc(m.content) + '</div>' +
+        (m.is_me ? '' : '<span class="msg-report-btn" data-message-id="' + esc(m.id) + '" title="Nachricht melden">🚩</span>') +
+      '</div>'
     ).join('');
     el.scrollTop = el.scrollHeight;
+    el.querySelectorAll('.msg-report-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (btn.classList.contains('reported')) return;
+        if (!(await showConfirmModal('Diese Nachricht melden? Unser Team schaut sich das an – separat vom Blockieren.', { okText: 'Melden', danger: true }))) return;
+        try {
+          await callRpc('report_message', { p_message_id: btn.dataset.messageId });
+          btn.textContent = '✅';
+          btn.classList.add('reported');
+          showToast('Danke, wir schauen uns das an.');
+        } catch (e) {
+          showToast('😅 Melden hat nicht geklappt: ' + friendlyErrorMessage(e));
+        }
+      });
+    });
   } catch (e) {
     renderFriendlyError(el, e, loadChatMessages, 'retryChat');
   }
@@ -1725,6 +1880,7 @@ function renderProfileEdit() {
   const activeMusic = new Set(g.music_preferences || []);
   const activeDrinks = new Set(g.favorite_drinks || []);
   el.innerHTML = `
+    <div class="hint" style="margin-bottom:10px;">Nur <strong>Name</strong> &amp; <strong>Crush Name</strong> sind Pflicht – der Rest ist optional und hilft nur bei besseren Matches.</div>
     <label for="editName">Name</label>
     <input id="editName" type="text" value="${esc(g.name)}">
     <label for="editQrCode">Crush Name</label>
@@ -1748,9 +1904,9 @@ function renderProfileEdit() {
         </select>
       </div>
     </div>
-    <label for="editAge">Alter</label>
+    <label for="editAge">Alter <span class="label-optional">Optional</span></label>
     <input id="editAge" type="number" min="18" max="99" value="${g.age ?? ''}" style="max-width:110px;">
-    <label for="editLookingFor">Sucht nach</label>
+    <label for="editLookingFor">Sucht nach <span class="label-optional">Optional</span></label>
     <select id="editLookingFor">
       <option value="offen" ${g.looking_for==='offen'?'selected':''}>Offen</option>
       <option value="flirt" ${g.looking_for==='flirt'?'selected':''}>Flirt</option>
@@ -1760,9 +1916,9 @@ function renderProfileEdit() {
       <option value="ueberrasch_mich" ${g.looking_for==='ueberrasch_mich'?'selected':''}>Überrasch mich 🎲</option>
       <option value="tanzpartner" ${g.looking_for==='tanzpartner'?'selected':''}>Tanzpartner für heute 💃</option>
     </select>
-    <label for="editLocation">Wohnort</label>
+    <label for="editLocation">Wohnort <span class="label-optional">Optional</span></label>
     <input id="editLocation" type="text" value="${esc(g.home_location || '')}">
-    <label>Profilbild</label>
+    <label>Profilbild <span class="label-optional">Optional</span></label>
     <div class="avatar-picker">
       <div id="photoPreviewWrap" class="avatar-picker-preview">${renderPhotoPreviewInner(g.photo_url)}</div>
       <div class="avatar-picker-btns">
@@ -1774,11 +1930,11 @@ function renderProfileEdit() {
     </div>
     <div class="hint" style="margin-top:6px; text-align:center;">Beim Emoji: Emoji-Tastatur deines Handys nutzen.</div>
     <div id="photoUploadErr" class="err-msg"></div>
-    <label>Interessen</label>
+    <label>Interessen <span class="label-optional">Optional</span></label>
     ${chipRowHtml('editInterestsChips', INTEREST_EMOJI, activeInterests, { allowCustom: true })}
-    <label>Musik</label>
+    <label>Musik <span class="label-optional">Optional</span></label>
     ${chipRowHtml('editMusicChips', MUSIC_EMOJI, activeMusic, { allowCustom: true })}
-    <label>Interessiert an einem…</label>
+    <label>Interessiert an einem… <span class="label-optional">Optional</span></label>
     ${chipRowHtml('editActivityChips', ACTIVITY_EMOJI, activeActivities)}
     <div id="editAgeErr" class="err-msg"></div>
     <button class="primary-btn" id="saveProfileBtn">Speichern</button>
@@ -2174,7 +2330,7 @@ async function startRandomMatch() {
   stopRandomMatchPolling();
   const area = document.getElementById('randomMatchArea');
   if (!area) return;
-  area.innerHTML = '<div class="loading">Suche jemanden…</div><div class="hint" id="randomMatchHint" style="margin:2px 0 0;"></div><button class="secondary-btn" id="randomMatchCancelBtn">Abbrechen</button>';
+  area.innerHTML = '<div class="random-match-pulse">🔀</div><div class="random-match-waiting-text">Suche jemanden…</div><div class="random-match-seconds" id="randomMatchSeconds">0s</div><div class="hint" id="randomMatchHint" style="margin:2px 0 0;"></div><button class="secondary-btn" id="randomMatchCancelBtn">Abbrechen</button>';
   document.getElementById('randomMatchCancelBtn').addEventListener('click', cancelRandomMatch);
   try {
     const rows = await callRpc('join_random_match', {});
@@ -2206,9 +2362,11 @@ async function pollRandomMatch() {
   const area = document.getElementById('randomMatchArea');
   if (area) {
     const hint = document.getElementById('randomMatchHint');
-    if (hint && randomMatchWaitStart) {
+    const secondsEl = document.getElementById('randomMatchSeconds');
+    if (randomMatchWaitStart) {
       const waitedS = Math.floor((Date.now() - randomMatchWaitStart) / 1000);
-      hint.textContent = waitedS > 12 ? 'Kann bis zu 45 Sekunden dauern…' : '';
+      if (secondsEl) secondsEl.textContent = waitedS + 's';
+      if (hint) hint.textContent = waitedS > 12 ? 'Kann bis zu 45 Sekunden dauern…' : '';
     }
   }
   try {
