@@ -1278,9 +1278,12 @@ async function doSwipe(response) {
   const combinedMsg = [inviteLine, icebreaker].filter(Boolean).join('\n');
   const icebreakerArg = (response === 'crush' && combinedMsg) ? combinedMsg : null;
   try {
-    const rows = await callRpc('crush_swipe', { p_target_guest_id: currentCandidate.id, p_response: response, p_icebreaker: icebreakerArg });
-    // A 'pass' (No) swipe returns no row — only 'crush' swipes ever produce a match record.
-    const m = rows && rows[0];
+    // crush_swipe RETURNS a single `matches` row (not a SETOF/TABLE) — PostgREST
+    // hands back one plain object, not an array. Indexing with [0] here used to
+    // silently produce undefined on every single swipe, so the in-flow "It's a
+    // Crush!" celebration screen never actually fired (matches still surfaced
+    // later via the toast poller/Crushes tab, which is why this went unnoticed).
+    const m = await callRpc('crush_swipe', { p_target_guest_id: currentCandidate.id, p_response: response, p_icebreaker: icebreakerArg });
     if (m && m.mutual) {
       feedbackMatch();
       const seen = getSeenMatches();
@@ -2062,7 +2065,11 @@ function renderProfileEdit() {
     if (age && (Number(age) < 18 || Number(age) > 99)) { errEl.textContent = 'Alter muss zwischen 18 und 99 liegen.'; return; }
     btn.disabled = true;
     try {
-      const rows = await callRpc('update_my_profile', {
+      // update_my_profile RETURNS a single `guests` row (not a SETOF/TABLE), so
+      // PostgREST/supabase-js hands back one plain object here, not an array —
+      // indexing it with [0] silently yields undefined and crashes the render
+      // right after a successful save, surfacing as a false "network" error.
+      const savedProfile = await callRpc('update_my_profile', {
         p_name: name, p_qr_code: qrCode, p_gender: gender, p_interested_in: interestedIn, p_age: age ? Number(age) : null,
         p_music_preferences: Array.from(activeMusic), p_favorite_drinks: Array.from(activeDrinks),
         p_looking_for: lookingFor, p_interests: Array.from(activeInterests),
@@ -2070,7 +2077,7 @@ function renderProfileEdit() {
         p_interested_in_activities: Array.from(activeActivities),
         p_photo_url: (photoChanged && pendingPhotoDataUrl) ? pendingPhotoDataUrl : null
       });
-      currentProfile = rows[0];
+      currentProfile = savedProfile;
       renderProfileView();
       showToast('✅ Profil gespeichert');
     } catch (e) {
@@ -2175,8 +2182,11 @@ async function renderExtrasSubtab() {
 async function renderGuestlistExtra(el) {
   el.innerHTML = '<div class="loading">Lade…</div>';
   try {
-    const rows = await callRpc('get_my_guestlist_request', {});
-    const existing = rows[0];
+    // get_my_guestlist_request RETURNS a single `guestlist_requests` row (or
+    // null) — not a SETOF/TABLE — so it comes back as a plain object/null, not
+    // an array. [0] on that always produced undefined, so the guest always saw
+    // the blank "join the list" form again, even after a request already existed.
+    const existing = await callRpc('get_my_guestlist_request', {});
     const statusLabel = existing ? ({ pending: '⏳ Angefragt – wir melden uns!', approved: '✅ Bestätigt, du bist drauf!', declined: '❌ Leider abgelehnt' }[existing.status]) : null;
     el.innerHTML = `
       <div class="extras-card">
