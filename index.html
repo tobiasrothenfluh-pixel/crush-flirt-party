@@ -842,6 +842,7 @@ function friendlyErrorMessage(e) {
 }
 function renderFriendlyError(container, err, retryFn, retryId) {
   console.error(err);
+  if (((err && err.message) || '').includes('not_checked_in')) { returnToLogin('Du bist nicht mehr eingecheckt – gib deinen Crush Name nochmal ein.'); return; }
   container.innerHTML = `
     <div class="err-card">
       <div class="emoji">😅</div>
@@ -1050,6 +1051,37 @@ async function checkActiveEvent() {
   }
 }
 checkActiveEvent();
+
+// ---------- Session-Wächter ----------
+// Nach einem Reset im Admin (Gäste gelöscht), beim Auschecken durchs Team oder wenn
+// das Event beendet wird, führt die App automatisch zurück zum Check-in, statt nur
+// "Kurzer Aussetzer" zu zeigen.
+function returnToLogin(message) {
+  if (document.getElementById('mainScreen').classList.contains('hidden')) return;
+  currentProfile = null;
+  currentCandidate = null;
+  document.getElementById('mainScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginQr').value = '';
+  document.getElementById('loginErr').textContent = message || '';
+  cachedActiveEventId = null;
+  checkActiveEvent();
+}
+async function verifyStillCheckedIn() {
+  if (document.hidden) return;
+  if (document.getElementById('mainScreen').classList.contains('hidden')) return;
+  try {
+    const eventId = await getActiveEventId(true);
+    if (!eventId) { returnToLogin('Das Event ist beendet – danke fürs Mitmachen! 💜'); return; }
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    const { data: rows, error } = await sb.from('guests').select('id, checked_out_at').eq('auth_user_id', user.id).eq('event_id', eventId).limit(1);
+    if (error) return; // Netzproblem: nicht rauswerfen
+    if (!rows.length || rows[0].checked_out_at) returnToLogin('Du bist nicht mehr eingecheckt – gib deinen Crush Name nochmal ein.');
+  } catch (e) { /* bei schlechtem Netz einfach beim nächsten Mal wieder prüfen */ }
+}
+setInterval(verifyStillCheckedIn, 20000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) verifyStillCheckedIn(); });
 
 // Rotates the Crush-Name field's placeholder through fun example names so the
 // empty login screen feels alive instead of showing one static example forever.
@@ -1822,7 +1854,7 @@ async function loadProfile() {
   el.innerHTML = '<div class="loading">Lade…</div>';
   try {
     const { data: { user } } = await sb.auth.getUser();
-    const { data: rows, error } = await sb.from('guests').select('*').eq('auth_user_id', user.id);
+    const { data: rows, error } = await sb.from('guests').select('*').eq('auth_user_id', user.id).order('checked_in_at', { ascending: false, nullsFirst: false }).limit(1);
     if (error) throw new Error(error.message);
     if (!rows.length) { el.innerHTML = '<div class="empty-state">Kein Profil gefunden.</div>'; return; }
     currentProfile = rows[0];
@@ -2090,7 +2122,7 @@ function renderProfileEdit() {
       if (raw === 'network_error' || raw === 'timeout' || /fetch|network/i.test(raw)) {
         try {
           const { data: { user } } = await sb.auth.getUser();
-          const { data: rows2 } = await sb.from('guests').select('*').eq('auth_user_id', user.id);
+          const { data: rows2 } = await sb.from('guests').select('*').eq('auth_user_id', user.id).order('checked_in_at', { ascending: false, nullsFirst: false }).limit(1);
           const saved = rows2 && rows2[0];
           if (saved && saved.name === name && saved.qr_code === qrCode) {
             currentProfile = saved;
