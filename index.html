@@ -987,8 +987,14 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // stuck forever — it's treated the same as a network error and retried.
 async function callRpc(name, args, _attempt) {
   const attempt = _attempt || 0;
-  const MAX_RETRIES = 3;
-  const TIMEOUT_MS = 9000;
+  const MAX_RETRIES = 4;
+  // Bad venue cellular/WiFi can push round-trip latency well past what a Wifi
+  // connection would need — 9s was tripping the race even on requests that
+  // ultimately succeeded server-side (confirmed via edge logs: 200 responses
+  // for calls the client had already given up on). 15s cuts down on that
+  // false-timeout rate; callers with their own recovery (e.g. the profile
+  // save handler's verify-after-failure check) still catch the rest.
+  const TIMEOUT_MS = 15000;
   let data, error;
   try {
     const result = await Promise.race([
@@ -2068,6 +2074,25 @@ function renderProfileEdit() {
       renderProfileView();
       showToast('✅ Profil gespeichert');
     } catch (e) {
+      // On flaky venue networks the client can give up (timeout/network_error)
+      // on a request that the server actually completed a moment later — we've
+      // seen this live (edge logs showing 200 for calls the guest saw fail).
+      // Before scaring the guest with an error, check whether the save landed
+      // anyway; if it did, treat it as success instead of a false alarm.
+      const raw = (e && e.message) || '';
+      if (raw === 'network_error' || raw === 'timeout' || /fetch|network/i.test(raw)) {
+        try {
+          const { data: { user } } = await sb.auth.getUser();
+          const { data: rows2 } = await sb.from('guests').select('*').eq('auth_user_id', user.id);
+          const saved = rows2 && rows2[0];
+          if (saved && saved.name === name && saved.qr_code === qrCode) {
+            currentProfile = saved;
+            renderProfileView();
+            showToast('✅ Profil gespeichert');
+            return;
+          }
+        } catch (verifyErr) { /* fall through to normal error handling below */ }
+      }
       const msg = friendlyErrorMessage(e);
       if (((e && e.message) || '').includes('qr_code_already_claimed') && qrErrEl) {
         qrErrEl.textContent = msg;
