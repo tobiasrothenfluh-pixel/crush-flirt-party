@@ -254,6 +254,10 @@ function normalizeInstagramHandle(input) {
 let eventId = null;
 let djCode = null;
 const DJ_CODE_KEY = 'crush_dj_code';
+// Tobi: no more manual code entry for the DJ — the gate screen is now only a
+// fallback shown if this auto-code ever stops matching the live event's code
+// (e.g. it gets rotated for a future event). Update this when that happens.
+const DJ_AUTO_CODE = 'CRUSH-DJ-2026';
 
 async function getActiveEventId() {
   const { data, error } = await sb.from('events').select('id, dj_name, dj_instagram, dj_accepting_requests').eq('status', 'checkin_open').order('event_date', { ascending: true }).limit(1);
@@ -445,10 +449,14 @@ function renderHistory() {
 
 (function init() {
   const saved = localStorage.getItem(DJ_CODE_KEY);
-  if (saved) {
-    document.getElementById('djCodeInput').value = saved;
-    tryUnlock(saved).catch(() => { localStorage.removeItem(DJ_CODE_KEY); });
-  }
+  const code = saved || DJ_AUTO_CODE;
+  document.getElementById('djCodeInput').value = code;
+  tryUnlock(code).catch(() => {
+    // Auto-code didn't work (wrong/rotated, or no event open right now) — fall
+    // back to the manual gate instead of silently failing.
+    localStorage.removeItem(DJ_CODE_KEY);
+    document.getElementById('djCodeInput').value = '';
+  });
 })();
 </script>
 
