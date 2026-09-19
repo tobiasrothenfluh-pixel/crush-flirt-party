@@ -1550,8 +1550,9 @@ async function pollForSongUpdates() {
   if (document.hidden) return;
   if (document.getElementById('mainScreen').classList.contains('hidden')) return;
   try {
-    const rows = await callRpc('list_extras', { p_kind: 'song' });
-    const mine = rows.filter(r => r.is_me);
+    // Nur die eigenen Wünsche abfragen statt der ganzen Liste – das ist bei
+    // vielen Gästen der Unterschied zwischen 800 und 200 Abfragen pro Minute.
+    const mine = await callRpc('my_song_requests', {});
     const seen = getSeenSongStatus();
     let changed = false;
     let firstChange = null;
@@ -1567,7 +1568,7 @@ async function pollForSongUpdates() {
     if (firstChange) showSongToast(firstChange.content, firstChange.status);
   } catch (e) {}
 }
-setInterval(pollForSongUpdates, 15000);
+setInterval(pollForSongUpdates, 20000);
 
 // currentProfile.id is our own guest row's id, already loaded via loadProfile().
 // The messages_insert RLS policy independently re-derives the sender from
