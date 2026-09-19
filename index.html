@@ -700,13 +700,13 @@
           Gilt nur für dieses Event und wird danach automatisch gelöscht.<br>
           Nachrichten &amp; Profile werden nicht dauerhaft gespeichert.
         </div>
-        <div class="toggle-new" id="newIdentityLink" style="margin-top:14px;">Anderes Handy? Neue Identität verwenden</div>
+        <button type="button" class="secondary-btn" id="newIdentityLink" style="margin-top:16px; width:100%;">🔄 Reset</button>
       </div>
       <div id="noEventNotice" class="hidden" style="text-align:center; padding:26px 6px; color:#9b8fae; font-size:13.5px; line-height:1.6;">
         📅 Aktuell ist kein Event offen.<br>Schau kurz vor Beginn nochmal vorbei!
       </div>
     </div>
-    <div class="version-footer">Version 1.1 · 2026</div>
+    <div class="version-footer">Version 1.2 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -2515,5 +2515,32 @@ function showRandomMatchResult(r) {
 }
 </script>
 
+<!--
+  CHANGELOG
+
+  Version 1.2 (2026-09-19):
+  - Login-Screen: "Anderes Handy? Neue Identität verwenden" Text-Link ersetzt
+    durch deutlich sichtbaren "🔄 Reset" Button (gleiche Funktion: setzt lokale
+    Session zurueck, neue Identitaet/QR-Code beim naechsten Einchecken).
+  - Kritischer Bugfix: update_my_profile, crush_swipe und
+    get_my_guestlist_request RETURNEN jeweils eine einzelne Zeile (kein
+    SETOF/TABLE), wurden im Frontend aber faelschlich per rows[0] indiziert
+    -> lieferte immer undefined. Betroffen waren: Profil speichern (zeigte
+    "Kurzer Aussetzer" Fehlermeldung obwohl der Speichervorgang serverseitig
+    erfolgreich war), das Match-Feier-Bildschirm beim Swipen (wurde nie
+    angezeigt) und der Gaestelisten-Anfragestatus (wurde nie angezeigt).
+    Alle drei Stellen greifen jetzt direkt auf das zurueckgegebene Objekt zu.
+  - callRpc: TIMEOUT_MS 9000->15000, MAX_RETRIES 3->4 (weniger falsche
+    Zeitueberschreitungen bei schlechtem Venue-WLAN) + Verify-Fallback beim
+    Profil speichern (liest den Gast direkt aus der DB, falls die Anfrage
+    einen Netzwerkfehler/Timeout zeigt, der Speichervorgang aber trotzdem
+    durchgekommen ist).
+
+  Version 1.1 und aelter:
+  - Live-Zaehler eingecheckter Gaeste, erweiterte Icebreaker-Sprueche,
+    Zufalls-Match Pulse-Animation, reduzierte Pflichtfelder im Profil,
+    "Zum Homescreen hinzufuegen" Banner, Rate-Limit auf Swipes (20/10s),
+    Melden-Button im Chat, Drop-off-Funnel-Daten im Backend.
+-->
 </body>
 </html>
