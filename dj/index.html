@@ -239,6 +239,7 @@ async function callRpc(name, args, attempt) {
 function formatRelativeTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
   const min = Math.floor((Date.now() - d.getTime()) / 60000);
   if (min < 1) return 'jetzt';
   if (min < 60) return 'vor ' + min + ' Min';
@@ -254,10 +255,13 @@ function normalizeInstagramHandle(input) {
 let eventId = null;
 let djCode = null;
 const DJ_CODE_KEY = 'crush_dj_code';
-// Tobi: no more manual code entry for the DJ — the gate screen is now only a
-// fallback shown if this auto-code ever stops matching the live event's code
-// (e.g. it gets rotated for a future event). Update this when that happens.
-const DJ_AUTO_CODE = 'CRUSH-DJ-2026';
+// The code never lives in this file (the page is public). It arrives either in
+// the DJ's personal link (/dj/?c=CODE, shown in the admin dashboard) or is typed
+// once on the gate screen; afterwards it is remembered on this device.
+let pollTimer = null, unlocked = false;
+function readStoredCode() { try { return localStorage.getItem(DJ_CODE_KEY); } catch (e) { return null; } }
+function storeCode(code) { try { localStorage.setItem(DJ_CODE_KEY, code); } catch (e) {} }
+function forgetCode() { try { localStorage.removeItem(DJ_CODE_KEY); } catch (e) {} }
 
 async function getActiveEventId() {
   const { data, error } = await sb.from('events').select('id, dj_name, dj_instagram, dj_accepting_requests').eq('status', 'checkin_open').order('event_date', { ascending: true }).limit(1);
@@ -275,11 +279,13 @@ async function tryUnlock(code) {
   document.getElementById('djNameInput').value = ev.dj_name || '';
   document.getElementById('djInstaInput').value = ev.dj_instagram || '';
   renderStatusBar(ev.dj_accepting_requests !== false);
-  localStorage.setItem(DJ_CODE_KEY, code);
+  storeCode(code);
+  unlocked = true;
   document.getElementById('gateScreen').classList.add('hidden');
   document.getElementById('djScreen').classList.remove('hidden');
   loadAll();
-  setInterval(loadAll, 6000);
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (!document.hidden) loadAll(); }, 6000);
 }
 
 document.getElementById('gateBtn').addEventListener('click', async () => {
@@ -302,7 +308,7 @@ document.getElementById('gateBtn').addEventListener('click', async () => {
 document.getElementById('djCodeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('gateBtn').click(); });
 
 document.getElementById('logoutLink').addEventListener('click', () => {
-  localStorage.removeItem(DJ_CODE_KEY);
+  forgetCode();
   location.reload();
 });
 
@@ -329,8 +335,9 @@ document.getElementById('djPauseBtn').addEventListener('click', async () => {
   const nowPaused = !btn.classList.contains('is-paused');
   btn.disabled = true;
   try {
-    const accepting = await callRpc('dj_set_accepting', { p_event_id: eventId, p_code: djCode, p_accepting: !nowPaused ? true : false });
-    renderStatusBar(accepting);
+    const wanted = !nowPaused;
+    const accepting = await callRpc('dj_set_accepting', { p_event_id: eventId, p_code: djCode, p_accepting: wanted });
+    renderStatusBar(typeof accepting === 'boolean' ? accepting : wanted);
   } catch (e) {
     alert('Fehler: ' + (e.message || e));
   } finally {
@@ -358,23 +365,50 @@ document.getElementById('djSaveBtn').addEventListener('click', async () => {
 });
 
 let allSongs = [];
-async function loadAll() {
+let loading = false, busyDecisions = 0;
+function backToGate(message) {
+  unlocked = false;
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  forgetCode();
+  document.getElementById('djScreen').classList.add('hidden');
+  document.getElementById('gateScreen').classList.remove('hidden');
+  document.getElementById('gateErr').textContent = message;
+}
+async function loadAll(force) {
+  if (loading) return;
+  if (busyDecisions > 0 && !force) return; // nicht unter dem Finger neu zeichnen
+  loading = true;
   try {
-    allSongs = await callRpc('dj_list_songs', { p_event_id: eventId, p_code: djCode });
+    const rows = await callRpc('dj_list_songs', { p_event_id: eventId, p_code: djCode });
+    allSongs = rows || [];
     renderQueue();
     renderAccepted();
     renderHistory();
+    const ev = await getActiveEventId();
+    if (ev && ev.id === eventId) renderStatusBar(ev.dj_accepting_requests !== false);
   } catch (e) {
     console.error(e);
+    if ((e.message || '').includes('invalid_dj_code')) backToGate('Der Zugang wurde geändert. Bitte neuen Link oder Code beim Team holen.');
+  } finally {
+    loading = false;
   }
 }
-document.getElementById('refreshBtn').addEventListener('click', loadAll);
+document.getElementById('refreshBtn').addEventListener('click', () => loadAll(true));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && unlocked) loadAll(true); });
 
-async function setStatus(id, status) {
+async function setStatus(id, status, srcBtn) {
+  const card = srcBtn && srcBtn.closest('.queue-card');
+  const btns = card ? card.querySelectorAll('button') : (srcBtn ? [srcBtn] : []);
+  btns.forEach(b => b.disabled = true);
+  busyDecisions++;
   try {
     await callRpc('dj_set_song_status', { p_event_id: eventId, p_code: djCode, p_extra_id: id, p_status: status });
-    await loadAll();
+    busyDecisions--;
+    await loadAll(true);
+    return;
   } catch (e) {
+    busyDecisions--;
+    btns.forEach(b => b.disabled = false);
     alert('Fehler: ' + (e.message || e));
   }
 }
@@ -398,7 +432,7 @@ function renderQueue() {
     </div>
   `).join('') + '</div>';
   el.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', () => setStatus(btn.dataset.id, btn.dataset.action));
+    btn.addEventListener('click', () => setStatus(btn.dataset.id, btn.dataset.action, btn));
   });
 }
 
@@ -420,7 +454,7 @@ function renderAccepted() {
     </div>
   `).join('') + '</div>';
   el.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', () => setStatus(btn.dataset.id, btn.dataset.action));
+    btn.addEventListener('click', () => setStatus(btn.dataset.id, btn.dataset.action, btn));
   });
 }
 
@@ -448,14 +482,19 @@ function renderHistory() {
 }
 
 (function init() {
-  const saved = localStorage.getItem(DJ_CODE_KEY);
-  const code = saved || DJ_AUTO_CODE;
-  document.getElementById('djCodeInput').value = code;
+  let fromLink = null;
+  try { fromLink = new URLSearchParams(location.search).get('c'); } catch (e) {}
+  if (fromLink) {
+    // Keep the code out of the address bar / screenshots once we have it.
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  }
+  const code = (fromLink || readStoredCode() || '').trim();
+  if (!code) return; // Gate-Screen zeigen
   tryUnlock(code).catch(() => {
-    // Auto-code didn't work (wrong/rotated, or no event open right now) — fall
-    // back to the manual gate instead of silently failing.
-    localStorage.removeItem(DJ_CODE_KEY);
+    if (unlocked) return;
+    forgetCode();
     document.getElementById('djCodeInput').value = '';
+    document.getElementById('gateErr').textContent = 'Zugang abgelaufen – bitte Code eingeben oder neuen Link beim Team holen.';
   });
 })();
 </script>
