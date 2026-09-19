@@ -80,6 +80,7 @@
   label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9b8fae; display: block; margin-top: 10px; }
   label .label-optional { font-weight: 400; text-transform: none; letter-spacing: normal; color: #695d7d; }
   input[type=text], input[type=number], select {
+    font-size: 16px;
     width: 100%;
     font-size: 15px;
     padding: 11px 13px;
@@ -989,14 +990,17 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // stuck forever — it's treated the same as a network error and retried.
 async function callRpc(name, args, _attempt) {
   const attempt = _attempt || 0;
-  const MAX_RETRIES = 4;
+  // Schreibende Aufrufe werden nicht wiederholt: ein Timeout heisst nicht, dass
+  // nichts ankam – sonst gibt es den Songwunsch oder die Anfrage doppelt.
+  const NO_RETRY = ['submit_extra', 'submit_guestlist_request', 'report_message', 'join_random_match'];
+  const MAX_RETRIES = NO_RETRY.indexOf(name) >= 0 ? 0 : 2;
   // Bad venue cellular/WiFi can push round-trip latency well past what a Wifi
   // connection would need — 9s was tripping the race even on requests that
   // ultimately succeeded server-side (confirmed via edge logs: 200 responses
   // for calls the client had already given up on). 15s cuts down on that
   // false-timeout rate; callers with their own recovery (e.g. the profile
   // save handler's verify-after-failure check) still catch the rest.
-  const TIMEOUT_MS = 15000;
+  const TIMEOUT_MS = 9000;
   let data, error;
   try {
     const result = await Promise.race([
@@ -1020,8 +1024,9 @@ async function callRpc(name, args, _attempt) {
 
 document.getElementById('newIdentityLink').addEventListener('click', async () => {
   try { localStorage.removeItem(SEEN_MATCHES_KEY); } catch (e) {}
+  try { localStorage.removeItem(SEEN_SONG_STATUS_KEY); } catch (e) {}
   sessionReady = false;
-  await sb.auth.signOut();
+  try { await sb.auth.signOut(); } catch (e) {}
   location.reload();
 });
 
@@ -1052,6 +1057,13 @@ async function checkActiveEvent() {
   }
 }
 checkActiveEvent();
+// Wer die App vor dem Check-in öffnet, soll nicht ewig "kein Event offen" sehen.
+setInterval(() => {
+  if (document.hidden) return;
+  if (document.getElementById('loginScreen').classList.contains('hidden')) return;
+  cachedActiveEventId = null;
+  checkActiveEvent();
+}, 30000);
 
 // ---------- Session-Wächter ----------
 // Nach einem Reset im Admin (Gäste gelöscht), beim Auschecken durchs Team oder wenn
@@ -1157,6 +1169,8 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 
 // ---------- Tabs ----------
 async function showTab(tab) {
+  const sendErr = document.getElementById('chatSendErr');
+  if (sendErr) sendErr.textContent = '';
   ['swipe', 'matches', 'chat', 'profile', 'extras'].forEach(t => {
     document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
   });
@@ -1830,6 +1844,8 @@ async function loadChatMessages() {
       '</div>'
     ).join('');
     el.scrollTop = el.scrollHeight;
+    const pane = document.getElementById('tab-chat');
+    if (pane) pane.scrollTop = pane.scrollHeight;
     el.querySelectorAll('.msg-report-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (btn.classList.contains('reported')) return;
@@ -1925,18 +1941,14 @@ function renderProfileView() {
   document.getElementById('checkoutBtn2').addEventListener('click', async (ev) => {
     const btn = ev.currentTarget;
     if (btn.disabled) return;
+    if (!(await showConfirmModal('Wirklich auschecken? Du wirst vom Event abgemeldet.', { okText: 'Auschecken', danger: true }))) return;
     btn.disabled = true;
     try {
       await callRpc('self_checkout', {});
-      currentProfile = null;
-      currentCandidate = null;
-      document.getElementById('mainScreen').classList.add('hidden');
-      document.getElementById('loginScreen').classList.remove('hidden');
-      document.getElementById('loginQr').value = '';
-      document.getElementById('loginErr').textContent = '';
+      returnToLogin('Du bist ausgecheckt. Bis bald 💜');
     } catch (e) {
-      alert('Fehler: ' + (e.message || e));
       btn.disabled = false;
+      alert('Fehler: ' + friendlyErrorMessage(e));
     }
   });
 }
@@ -2003,6 +2015,8 @@ function renderProfileEdit() {
     ${chipRowHtml('editInterestsChips', INTEREST_EMOJI, activeInterests, { allowCustom: true })}
     <label>Musik <span class="label-optional">Optional</span></label>
     ${chipRowHtml('editMusicChips', MUSIC_EMOJI, activeMusic, { allowCustom: true })}
+    <label>Getränke <span class="label-optional">Optional</span></label>
+    ${chipRowHtml('editDrinksChips', DRINK_EMOJI, activeDrinks, { allowCustom: true })}
     <label>Interessiert an einem… <span class="label-optional">Optional</span></label>
     ${chipRowHtml('editActivityChips', ACTIVITY_EMOJI, activeActivities)}
     <div id="editAgeErr" class="err-msg"></div>
@@ -2013,6 +2027,7 @@ function renderProfileEdit() {
   `;
   wireChipRow('editInterestsChips', activeInterests);
   wireChipRow('editMusicChips', activeMusic);
+  wireChipRow('editDrinksChips', activeDrinks);
   wireChipRow('editActivityChips', activeActivities);
 
   let pendingPhotoDataUrl = null;
@@ -2096,15 +2111,10 @@ function renderProfileEdit() {
     btn.disabled = true;
     try {
       await callRpc('self_checkout', {});
-      currentProfile = null;
-      currentCandidate = null;
-      document.getElementById('mainScreen').classList.add('hidden');
-      document.getElementById('loginScreen').classList.remove('hidden');
-      document.getElementById('loginQr').value = '';
-      document.getElementById('loginErr').textContent = '';
+      returnToLogin('Du bist ausgecheckt. Bis bald 💜');
     } catch (e) {
-      alert('Fehler: ' + (e.message || e));
       btn.disabled = false;
+      alert('Fehler: ' + friendlyErrorMessage(e));
     }
   });
   document.getElementById('saveProfileBtn').addEventListener('click', async (ev) => {
