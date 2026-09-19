@@ -195,7 +195,8 @@
     </div>
   </details>
 
-  <div class="section-title" style="margin-top:14px;">Warteschlange</div>
+  <div id="staleHint" style="color:#fbbf24; font-size:13px; font-weight:700; min-height:18px; margin-top:14px;"></div>
+  <div class="section-title" style="margin-top:6px;">Warteschlange</div>
   <div id="queueArea"><div class="muted">Lade…</div></div>
 
   <div class="section-title">Angenommen – wartet auf Play</div>
@@ -264,7 +265,7 @@ function storeCode(code) { try { localStorage.setItem(DJ_CODE_KEY, code); } catc
 function forgetCode() { try { localStorage.removeItem(DJ_CODE_KEY); } catch (e) {} }
 
 async function getActiveEventId() {
-  const { data, error } = await sb.from('events').select('id, dj_name, dj_instagram, dj_accepting_requests').eq('status', 'checkin_open').order('event_date', { ascending: true }).limit(1);
+  const { data, error } = await sb.from('events').select('id, dj_name, dj_instagram, dj_accepting_requests').in('status', ['checkin_open','running']).order('event_date', { ascending: true }).limit(1);
   if (error) throw new Error(error.message);
   return (data && data[0]) || null;
 }
@@ -365,7 +366,14 @@ document.getElementById('djSaveBtn').addEventListener('click', async () => {
 });
 
 let allSongs = [];
-let loading = false, busyDecisions = 0;
+let loading = false, busyDecisions = 0, lastLoadOk = 0;
+function renderStale() {
+  const el = document.getElementById('staleHint');
+  if (!el) return;
+  const old = lastLoadOk && Date.now() - lastLoadOk > 25000;
+  el.textContent = old ? '⚠️ Liste ist ' + Math.round((Date.now() - lastLoadOk) / 1000) + ' s alt – Verbindung prüfen' : '';
+}
+setInterval(renderStale, 5000);
 function backToGate(message) {
   unlocked = false;
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
@@ -374,8 +382,9 @@ function backToGate(message) {
   document.getElementById('gateScreen').classList.remove('hidden');
   document.getElementById('gateErr').textContent = message;
 }
+let reloadQueued = false;
 async function loadAll(force) {
-  if (loading) return;
+  if (loading) { if (force) reloadQueued = true; return; }
   if (busyDecisions > 0 && !force) return; // nicht unter dem Finger neu zeichnen
   loading = true;
   try {
@@ -386,11 +395,14 @@ async function loadAll(force) {
     renderHistory();
     const ev = await getActiveEventId();
     if (ev && ev.id === eventId) renderStatusBar(ev.dj_accepting_requests !== false);
+    lastLoadOk = Date.now();
+    renderStale();
   } catch (e) {
     console.error(e);
     if ((e.message || '').includes('invalid_dj_code')) backToGate('Der Zugang wurde geändert. Bitte neuen Link oder Code beim Team holen.');
   } finally {
     loading = false;
+    if (reloadQueued) { reloadQueued = false; setTimeout(() => loadAll(true), 0); }
   }
 }
 document.getElementById('refreshBtn').addEventListener('click', () => loadAll(true));
@@ -484,17 +496,28 @@ function renderHistory() {
 (function init() {
   let fromLink = null;
   try { fromLink = new URLSearchParams(location.search).get('c'); } catch (e) {}
-  if (fromLink) {
-    // Keep the code out of the address bar / screenshots once we have it.
-    try { history.replaceState(null, '', location.pathname); } catch (e) {}
-  }
   const code = (fromLink || readStoredCode() || '').trim();
   if (!code) return; // Gate-Screen zeigen
-  tryUnlock(code).catch(() => {
+  if (fromLink) {
+    // Gleich merken, damit ein Netz-Aussetzer den Code nicht verschluckt,
+    // und erst dann aus der Adresszeile nehmen.
+    storeCode(code);
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  }
+  document.getElementById('djCodeInput').value = code;
+  tryUnlock(code).catch((e) => {
     if (unlocked) return;
-    forgetCode();
-    document.getElementById('djCodeInput').value = '';
-    document.getElementById('gateErr').textContent = 'Zugang abgelaufen – bitte Code eingeben oder neuen Link beim Team holen.';
+    const msg = (e && e.message) || '';
+    if (msg.includes('invalid_dj_code')) {
+      // Nur ein wirklich falscher Code wird vergessen – bei Netzproblemen bleibt er.
+      forgetCode();
+      document.getElementById('djCodeInput').value = '';
+      document.getElementById('gateErr').textContent = 'Code stimmt nicht mehr – bitte neuen Link beim Team holen.';
+      return;
+    }
+    document.getElementById('gateErr').textContent = msg.includes('no_active_event')
+      ? 'Aktuell ist kein Event offen – sobald der Check-in startet, hier neu laden.'
+      : 'Verbindung gerade schwierig – bitte «Freischalten» antippen.';
   });
 })();
 </script>
