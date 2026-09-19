@@ -80,9 +80,9 @@
   label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9b8fae; display: block; margin-top: 10px; }
   label .label-optional { font-weight: 400; text-transform: none; letter-spacing: normal; color: #695d7d; }
   input[type=text], input[type=number], select {
-    font-size: 16px;
     width: 100%;
-    font-size: 15px;
+    /* 16px: alles darunter lässt iOS beim Tippen in das Feld hineinzoomen. */
+    font-size: 16px;
     padding: 11px 13px;
     margin-top: 4px;
     border-radius: 12px;
@@ -963,15 +963,22 @@ function feedbackMatch() {
 // — now every request carries a real GoTrue-signed token, so RLS policies and
 // auth.uid() inside the SECURITY DEFINER functions work exactly as designed,
 // and the public site never needs any elevated/service-role access.
-let sessionReady = false;
+let sessionReady = false, sessionPromise = null;
 async function ensureSession() {
   if (sessionReady) return;
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    const { error } = await sb.auth.signInAnonymously();
-    if (error) throw new Error('auth_failed: ' + error.message);
+  // Zwei parallele Aufrufe dürfen nicht zwei anonyme Anmeldungen starten –
+  // sonst gehört der Check-in plötzlich zur zweiten Identität.
+  if (!sessionPromise) {
+    sessionPromise = (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        const { error } = await sb.auth.signInAnonymously();
+        if (error) throw new Error('auth_failed: ' + error.message);
+      }
+      sessionReady = true;
+    })().catch(e => { sessionPromise = null; throw e; });
   }
-  sessionReady = true;
+  await sessionPromise;
 }
 
 // Calls a Postgres RPC function and unwraps { data, error } into a plain
@@ -1038,7 +1045,7 @@ document.getElementById('newIdentityLink').addEventListener('click', async () =>
 let cachedActiveEventId = null;
 async function getActiveEventId(force) {
   if (cachedActiveEventId && !force) return cachedActiveEventId;
-  const { data, error } = await sb.from('events').select('id').eq('status', 'checkin_open').order('event_date', { ascending: true }).limit(1);
+  const { data, error } = await sb.from('events').select('id').in('status', ['checkin_open','running']).order('event_date', { ascending: false }).limit(1);
   if (error) throw new Error(error.message);
   cachedActiveEventId = (data && data[0]) ? data[0].id : null;
   return cachedActiveEventId;
@@ -1071,6 +1078,9 @@ setInterval(() => {
 // "Kurzer Aussetzer" zu zeigen.
 function returnToLogin(message) {
   if (document.getElementById('mainScreen').classList.contains('hidden')) return;
+  const ov = document.getElementById('confirmOverlay');
+  if (ov) ov.classList.remove('show');
+  confirmOpen = false;
   currentProfile = null;
   currentCandidate = null;
   document.getElementById('mainScreen').classList.add('hidden');
@@ -1715,14 +1725,14 @@ async function loadMatches() {
         if (btn.dataset.action === 'unmatch') {
           if (!(await showConfirmModal(partnerName + ' aus deinen Crushes entfernen? Der Chat-Verlauf geht verloren.', { okText: 'Entfernen', danger: true }))) return;
           await guardClick(btn, async () => {
-            await callRpc('unmatch', { p_match_id: matchId });
-            await loadMatches();
+            try { await callRpc('unmatch', { p_match_id: matchId }); await loadMatches(); }
+            catch (e) { showToast(friendlyErrorMessage(e)); }
           });
         } else if (btn.dataset.action === 'block') {
           if (!(await showConfirmModal(partnerName + ' blockieren? Ihr seht euch danach gegenseitig nicht mehr.', { okText: 'Blockieren', danger: true }))) return;
           await guardClick(btn, async () => {
-            await callRpc('block_guest', { p_target_guest_id: partnerId });
-            await loadMatches();
+            try { await callRpc('block_guest', { p_target_guest_id: partnerId }); await loadMatches(); }
+            catch (e) { showToast(friendlyErrorMessage(e)); }
           });
         } else if (btn.dataset.action === 'invite') {
           toggleInvitePanel(item.querySelector('.match-invite-panel'), matchId, async () => {
@@ -1806,17 +1816,15 @@ document.querySelectorAll('#chatActionsPanel .match-action-btn').forEach(btn => 
     if (btn.dataset.action === 'unmatch') {
       if (!(await showConfirmModal('Aus deinen Crushes entfernen? Der Chat-Verlauf geht verloren.', { okText: 'Entfernen', danger: true }))) return;
       await guardClick(btn, async () => {
-        await callRpc('unmatch', { p_match_id: currentMatchId });
-        showTab('matches');
-        await loadMatches();
+        try { await callRpc('unmatch', { p_match_id: currentMatchId }); showTab('matches'); await loadMatches(); }
+        catch (e) { showToast(friendlyErrorMessage(e)); }
       });
     } else if (btn.dataset.action === 'block') {
       if (!currentPartnerId) return;
       if (!(await showConfirmModal('Diese Person blockieren? Ihr seht euch danach gegenseitig nicht mehr.', { okText: 'Blockieren', danger: true }))) return;
       await guardClick(btn, async () => {
-        await callRpc('block_guest', { p_target_guest_id: currentPartnerId });
-        showTab('matches');
-        await loadMatches();
+        try { await callRpc('block_guest', { p_target_guest_id: currentPartnerId }); showTab('matches'); await loadMatches(); }
+        catch (e) { showToast(friendlyErrorMessage(e)); }
       });
     } else if (btn.dataset.action === 'invite') {
       toggleInvitePanel(document.getElementById('chatInvitePanel'), currentMatchId, async () => {
