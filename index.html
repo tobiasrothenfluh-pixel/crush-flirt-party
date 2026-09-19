@@ -802,6 +802,7 @@ const FRIENDLY_ERRORS = [
   { match: 'invalid_target', text: 'Diese Person ist nicht (mehr) verfügbar.' },
   { match: 'empty_content', text: 'Bitte etwas eingeben.' },
   { match: 'dj_paused', text: 'Der DJ pausiert gerade neue Musikwünsche – schau später nochmal vorbei!' },
+  { match: 'rate_limited', text: 'Kurz durchatmen 😅 – gleich wieder weiterswipen.' },
   { match: 'auth_failed', text: 'Anmeldung gerade nicht möglich. Bitte kurz beim Team melden.' },
 ];
 function formatRelativeTime(iso) {
@@ -847,7 +848,7 @@ function renderFriendlyError(container, err, retryFn, retryId) {
     <div class="err-card">
       <div class="emoji">😅</div>
       <h4>Nicht gecrusht, sondern gecrasht</h4>
-      <p>Kurzer Aussetzer – bitte nochmal versuchen.</p>
+      <p>${esc(friendlyErrorMessage(err))}</p>
       <button class="secondary-btn" id="${retryId}">🔄 Nochmal versuchen</button>
     </div>
   `;
@@ -1018,7 +1019,7 @@ async function callRpc(name, args, _attempt) {
 }
 
 document.getElementById('newIdentityLink').addEventListener('click', async () => {
-  localStorage.removeItem(SEEN_MATCHES_KEY);
+  try { localStorage.removeItem(SEEN_MATCHES_KEY); } catch (e) {}
   sessionReady = false;
   await sb.auth.signOut();
   location.reload();
@@ -1064,20 +1065,27 @@ function returnToLogin(message) {
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginQr').value = '';
   document.getElementById('loginErr').textContent = message || '';
+  myEventId = null;
   cachedActiveEventId = null;
   checkActiveEvent();
 }
+// The guest's own event, pinned at check-in. Deliberately NOT "whatever event is
+// open right now": closing check-in mid-party or preparing the next event must
+// never log the whole venue out.
+let myEventId = null;
 async function verifyStillCheckedIn() {
   if (document.hidden) return;
   if (document.getElementById('mainScreen').classList.contains('hidden')) return;
+  if (!myEventId) return;
   try {
-    const eventId = await getActiveEventId(true);
-    if (!eventId) { returnToLogin('Das Event ist beendet – danke fürs Mitmachen! 💜'); return; }
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return;
-    const { data: rows, error } = await sb.from('guests').select('id, checked_out_at').eq('auth_user_id', user.id).eq('event_id', eventId).limit(1);
-    if (error) return; // Netzproblem: nicht rauswerfen
-    if (!rows.length || rows[0].checked_out_at) returnToLogin('Du bist nicht mehr eingecheckt – gib deinen Crush Name nochmal ein.');
+    const { data: rows, error } = await sb.from('guests').select('id, checked_out_at').eq('auth_user_id', user.id).eq('event_id', myEventId).limit(1);
+    if (error) return; // Netzproblem: niemanden rauswerfen
+    if (!rows.length) { returnToLogin('Du bist nicht mehr eingecheckt – gib deinen Crush Name nochmal ein.'); return; }
+    if (rows[0].checked_out_at) { returnToLogin('Du wurdest ausgecheckt – gib deinen Crush Name nochmal ein.'); return; }
+    const { data: ev, error: evErr } = await sb.from('events').select('status').eq('id', myEventId).maybeSingle();
+    if (!evErr && ev && ev.status === 'finished') returnToLogin('Das Event ist beendet – danke fürs Mitmachen! 💜');
   } catch (e) { /* bei schlechtem Netz einfach beim nächsten Mal wieder prüfen */ }
 }
 setInterval(verifyStillCheckedIn, 20000);
@@ -1128,11 +1136,12 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       p_photo_url: null, p_interested_in_activities: []
     });
     const isNew = rows[0] && rows[0].is_new;
+    myEventId = (rows[0] && rows[0].event_id) || eventId;
+    await seedSeenMatches();
+    await seedSeenSongStatus();
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('mainScreen').classList.remove('hidden');
     maybeShowA2HSBanner();
-    await seedSeenMatches();
-    await seedSeenSongStatus();
     if (isNew) {
       await showTab('profile');
       renderProfileEdit();
@@ -1361,7 +1370,7 @@ function getSeenMatches() {
   try { return new Set(JSON.parse(localStorage.getItem(SEEN_MATCHES_KEY) || '[]')); } catch (e) { return new Set(); }
 }
 function saveSeenMatches(set) {
-  localStorage.setItem(SEEN_MATCHES_KEY, JSON.stringify(Array.from(set)));
+  try { localStorage.setItem(SEEN_MATCHES_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
 }
 async function seedSeenMatches() {
   try {
@@ -1388,8 +1397,12 @@ document.getElementById('crushToast').addEventListener('click', () => {
 // Styled in-app replacement for window.confirm() — resolves true/false like
 // the native dialog, but matches the app's dark/gradient design instead of
 // popping the browser's default system alert.
+let confirmOpen = false;
 function showConfirmModal(message, opts) {
   opts = opts || {};
+  // Zwei schnelle Taps dürfen nicht zwei Aktionen an denselben OK-Knopf hängen.
+  if (confirmOpen) return Promise.resolve(false);
+  confirmOpen = true;
   const overlay = document.getElementById('confirmOverlay');
   const okBtn = document.getElementById('confirmOkBtn');
   const cancelBtn = document.getElementById('confirmCancelBtn');
@@ -1399,6 +1412,7 @@ function showConfirmModal(message, opts) {
   okBtn.classList.toggle('danger', !!opts.danger);
   return new Promise((resolve) => {
     function cleanup(result) {
+      confirmOpen = false;
       overlay.classList.remove('show');
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
@@ -1466,7 +1480,7 @@ function maybeShowA2HSBanner() {
   const banner = document.getElementById('a2hsBanner');
   if (!banner) return;
   if (isStandaloneDisplay()) return; // already installed/running as an app
-  if (localStorage.getItem(A2HS_DISMISSED_KEY)) return;
+  try { if (localStorage.getItem(A2HS_DISMISSED_KEY)) return; } catch (e) {}
 
   const ua = window.navigator.userAgent || '';
   const isIOS = /iP(hone|od|ad)/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
@@ -1486,7 +1500,7 @@ function maybeShowA2HSBanner() {
         await deferredInstallPrompt.userChoice;
       } catch (e) {}
       deferredInstallPrompt = null;
-      localStorage.setItem(A2HS_DISMISSED_KEY, '1');
+      try { localStorage.setItem(A2HS_DISMISSED_KEY, '1'); } catch (e) {}
     };
   } else if (isIOS) {
     textEl.textContent = '📲 Zum Home-Bildschirm hinzufügen: Teilen-Symbol ⬆️ → „Zum Home-Bildschirm“.';
@@ -1502,7 +1516,7 @@ function maybeShowA2HSBanner() {
   banner.classList.remove('hidden');
   document.getElementById('a2hsBannerClose').addEventListener('click', () => {
     banner.classList.add('hidden');
-    localStorage.setItem(A2HS_DISMISSED_KEY, '1');
+    try { localStorage.setItem(A2HS_DISMISSED_KEY, '1'); } catch (e) {}
   }, { once: true });
 }
 
@@ -1515,7 +1529,7 @@ function getSeenSongStatus() {
   try { return JSON.parse(localStorage.getItem(SEEN_SONG_STATUS_KEY) || '{}'); } catch (e) { return {}; }
 }
 function saveSeenSongStatus(map) {
-  localStorage.setItem(SEEN_SONG_STATUS_KEY, JSON.stringify(map));
+  try { localStorage.setItem(SEEN_SONG_STATUS_KEY, JSON.stringify(map)); } catch (e) {}
 }
 async function seedSeenSongStatus() {
   try {
@@ -1559,9 +1573,20 @@ setInterval(pollForSongUpdates, 15000);
 // The messages_insert RLS policy independently re-derives the sender from
 // auth.uid() server-side and rejects the row if it doesn't match, so passing
 // this explicitly here is just what value to insert — not a trust boundary.
-async function sendMessage(matchId, content) {
+async function sendMessage(matchId, content, _attempt) {
   if (!currentProfile) await loadProfile();
-  const { error } = await sb.from('messages').insert({ match_id: matchId, sender_id: currentProfile.id, content });
+  const attempt = _attempt || 0;
+  let error;
+  try {
+    const result = await Promise.race([
+      sb.from('messages').insert({ match_id: matchId, sender_id: currentProfile.id, content }),
+      sleep(15000).then(() => { throw new Error('timeout'); })
+    ]);
+    error = result.error;
+  } catch (networkErr) {
+    if (attempt < 2) { await sleep(700 * Math.pow(2, attempt)); return sendMessage(matchId, content, attempt + 1); }
+    throw new Error('network_error');
+  }
   if (error) throw new Error(error.message);
 }
 
@@ -1854,7 +1879,9 @@ async function loadProfile() {
   el.innerHTML = '<div class="loading">Lade…</div>';
   try {
     const { data: { user } } = await sb.auth.getUser();
-    const { data: rows, error } = await sb.from('guests').select('*').eq('auth_user_id', user.id).order('checked_in_at', { ascending: false, nullsFirst: false }).limit(1);
+    let qy = sb.from('guests').select('*').eq('auth_user_id', user.id);
+    if (myEventId) qy = qy.eq('event_id', myEventId);
+    const { data: rows, error } = await qy.order('checked_in_at', { ascending: false, nullsFirst: false }).limit(1);
     if (error) throw new Error(error.message);
     if (!rows.length) { el.innerHTML = '<div class="empty-state">Kein Profil gefunden.</div>'; return; }
     currentProfile = rows[0];
@@ -2122,7 +2149,9 @@ function renderProfileEdit() {
       if (raw === 'network_error' || raw === 'timeout' || /fetch|network/i.test(raw)) {
         try {
           const { data: { user } } = await sb.auth.getUser();
-          const { data: rows2 } = await sb.from('guests').select('*').eq('auth_user_id', user.id).order('checked_in_at', { ascending: false, nullsFirst: false }).limit(1);
+          let qy2 = sb.from('guests').select('*').eq('auth_user_id', user.id);
+          if (myEventId) qy2 = qy2.eq('event_id', myEventId);
+          const { data: rows2 } = await qy2.order('checked_in_at', { ascending: false, nullsFirst: false }).limit(1);
           const saved = rows2 && rows2[0];
           if (saved && saved.name === name && saved.qr_code === qrCode) {
             currentProfile = saved;
@@ -2268,9 +2297,9 @@ async function renderGuestlistExtra(el) {
 
 // events is publicly SELECTable per RLS (events_select_public), so this is a
 // plain authenticated read — no SECURITY DEFINER function needed.
-let cachedDjInfo = null;
+let cachedDjInfo = null, cachedDjInfoAt = 0;
 async function getDjInfo() {
-  if (cachedDjInfo) return cachedDjInfo;
+  if (cachedDjInfo && Date.now() - cachedDjInfoAt < 30000) return cachedDjInfo;
   try {
     if (!currentProfile) await loadProfile();
     const { data, error } = await sb.from('events')
@@ -2279,7 +2308,8 @@ async function getDjInfo() {
       .single();
     if (error) throw error;
     cachedDjInfo = data || {};
-  } catch (e) { cachedDjInfo = {}; }
+    cachedDjInfoAt = Date.now();
+  } catch (e) { return cachedDjInfo || {}; }
   return cachedDjInfo;
 }
 function instagramUrl(handle) {
