@@ -102,7 +102,8 @@
   label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #9b8fae; display: block; margin-bottom: 4px; }
   input[type=text], input[type=password] {
     width: 100%;
-    font-size: 14px;
+    /* 16px verhindert, dass iOS beim Tippen hineinzoomt. */
+    font-size: 16px;
     padding: 10px 12px;
     border-radius: 10px;
     border: 1px solid #362c47;
@@ -265,7 +266,7 @@ function storeCode(code) { try { localStorage.setItem(DJ_CODE_KEY, code); } catc
 function forgetCode() { try { localStorage.removeItem(DJ_CODE_KEY); } catch (e) {} }
 
 async function getActiveEventId() {
-  const { data, error } = await sb.from('events').select('id, dj_name, dj_instagram, dj_accepting_requests').in('status', ['checkin_open','running']).order('event_date', { ascending: true }).limit(1);
+  const { data, error } = await sb.from('events').select('id, dj_name, dj_instagram, dj_accepting_requests').in('status', ['checkin_open','running']).order('event_date', { ascending: false }).limit(1);
   if (error) throw new Error(error.message);
   return (data && data[0]) || null;
 }
