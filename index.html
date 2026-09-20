@@ -1858,6 +1858,7 @@ async function openChat(matchId, partnerName, partnerQr, partnerId) {
   document.getElementById('chatMiniProfile').classList.remove('open');
   document.getElementById('chatMiniProfile').innerHTML = '';
   document.getElementById('chatSendErr').textContent = '';
+  lastChatMessageCount = -1;
   showTab('chat');
   await loadChatMessages();
 }
@@ -1895,12 +1896,19 @@ document.querySelectorAll('#chatActionsPanel .match-action-btn').forEach(btn => 
   });
 });
 
-async function loadChatMessages() {
+let lastChatMessageCount = -1;
+async function loadChatMessages(opts) {
   const el = document.getElementById('chatMessages');
   if (!currentMatchId) return;
-  el.innerHTML = '<div class="loading">Lade…</div>';
+  const silent = !!(opts && opts.silent);
+  if (!silent) el.innerHTML = '<div class="loading">Lade…</div>';
   try {
     const rows = await callRpc('get_match_messages', { p_match_id: currentMatchId });
+    // In silent (background-poll) mode, skip the re-render entirely when the
+    // message count hasn't changed — avoids a flicker/scroll-jump every 4s
+    // for the (very common) case where nothing new has arrived.
+    if (silent && rows.length === lastChatMessageCount) return;
+    lastChatMessageCount = rows.length;
     if (!rows.length) {
       el.innerHTML = '<div class="empty-state">Sag Hallo 👋</div>';
       return;
@@ -1929,9 +1937,21 @@ async function loadChatMessages() {
       });
     });
   } catch (e) {
-    renderFriendlyError(el, e, loadChatMessages, 'retryChat');
+    if (!silent) renderFriendlyError(el, e, loadChatMessages, 'retryChat');
   }
 }
+
+// Background refresh while a chat is open, so a reply from the other person
+// shows up without having to leave and reopen the chat. Mirrors the
+// visibility/tab guards already used by the other pollers in this file.
+async function pollChatMessages() {
+  if (document.hidden) return;
+  if (!currentMatchId) return;
+  const pane = document.getElementById('tab-chat');
+  if (!pane || pane.classList.contains('hidden')) return;
+  await loadChatMessages({ silent: true });
+}
+setInterval(pollChatMessages, 4000);
 
 document.getElementById('chatSendBtn').addEventListener('click', async () => {
   const input = document.getElementById('chatInput');
@@ -2595,6 +2615,14 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.2.3 (2026-09-20):
+  - Kritischer Bugfix: Chat hat waehrend des Offenseins nie neue Nachrichten
+    nachgeladen -- get_match_messages() wurde nur beim Oeffnen und nach dem
+    eigenen Senden aufgerufen. Antwortete die andere Person, sah man das erst
+    nach Verlassen und erneutem Oeffnen des Chats. Jetzt Hintergrund-Polling
+    alle 4s waehrend der Chat-Screen sichtbar ist (pausiert wenn Tab/Screen
+    nicht aktiv, kein Re-Render wenn sich nichts geaendert hat).
 
   Version 1.2.2 (2026-09-20):
   - Serverseitiges Rate-Limit + Längenlimit fuer Chat-Nachrichten (max. 500
