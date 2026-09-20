@@ -701,12 +701,15 @@
           Gilt nur für dieses Event und wird danach automatisch gelöscht.<br>
           Nachrichten &amp; Profile werden nicht dauerhaft gespeichert.
         </div>
-        <button type="button" class="secondary-btn" id="newIdentityLink" style="margin-top:16px; width:100%;">🔄 Reset</button>
       </div>
       <div id="noEventNotice" class="hidden" style="text-align:center; padding:26px 6px; color:#9b8fae; font-size:13.5px; line-height:1.6;">
         📅 Aktuell ist kein Event offen.<br>Schau kurz vor Beginn nochmal vorbei!
       </div>
     </div>
+    <!-- Bewusst sehr dezent (kleine graue Textzeile statt Button) und per Code
+         gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
+         ihre Identität zurücksetzen. -->
+    <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
     <div class="version-footer">Version 1.2 · 2026</div>
   </div>
 
@@ -1029,7 +1032,20 @@ async function callRpc(name, args, _attempt) {
   return data;
 }
 
+// Sehr dezent platziert (kleine Textzeile, kein Button) und zusätzlich per
+// Code gesperrt, damit ein Gast nicht aus Versehen (falscher Tap) seine
+// Identität verliert. Der Code ist bewusst simpel und clientseitig geprüft —
+// es geht nicht um echten Zugriffsschutz, sondern nur um eine Absicherung
+// gegen Versehen; die eigentliche Aktion (Session/Profil zurücksetzen) bleibt
+// serverseitig sicher, weil sie nur den eigenen Auth-User betrifft.
+const RESET_CODE = '12345';
 document.getElementById('newIdentityLink').addEventListener('click', async () => {
+  const code = window.prompt('Code eingeben, um die Identität zurückzusetzen:');
+  if (code === null) return; // abgebrochen
+  if (code.trim() !== RESET_CODE) {
+    showToast('❌ Falscher Code');
+    return;
+  }
   try { localStorage.removeItem(SEEN_MATCHES_KEY); } catch (e) {}
   try { localStorage.removeItem(SEEN_SONG_STATUS_KEY); } catch (e) {}
   sessionReady = false;
@@ -2535,6 +2551,14 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.2.1 (2026-09-20):
+  - Login-Screen: Reset-Button wieder dezenter gemacht (kleine graue
+    Textzeile statt auffälligem Button) und zusätzlich mit einem Code
+    (Prompt-Abfrage) abgesichert, damit er nicht aus Versehen angetippt
+    wird. Rein clientseitige Absicherung gegen Versehen, kein echter
+    Zugriffsschutz -- die dahinterliegende Aktion war schon vorher nur
+    auf die eigene Session des Gasts beschränkt.
 
   Version 1.2 (2026-09-19):
   - Login-Screen: "Anderes Handy? Neue Identität verwenden" Text-Link ersetzt
