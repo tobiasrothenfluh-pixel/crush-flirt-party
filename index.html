@@ -678,6 +678,7 @@
   <div class="confirm-overlay" id="confirmOverlay">
     <div class="confirm-card">
       <p id="confirmMessage"></p>
+      <input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" id="confirmCodeInput" class="hidden" placeholder="Code" style="margin-top:2px; text-align:center; letter-spacing:0.2em;">
       <div class="confirm-actions">
         <button class="confirm-cancel" id="confirmCancelBtn">Abbrechen</button>
         <button class="primary-btn confirm-ok" id="confirmOkBtn" style="margin-top:0;">OK</button>
@@ -1040,7 +1041,7 @@ async function callRpc(name, args, _attempt) {
 // serverseitig sicher, weil sie nur den eigenen Auth-User betrifft.
 const RESET_CODE = '12345';
 document.getElementById('newIdentityLink').addEventListener('click', async () => {
-  const code = window.prompt('Code eingeben, um die Identität zurückzusetzen:');
+  const code = await showCodePromptModal('Code eingeben, um die Identität zurückzusetzen:');
   if (code === null) return; // abgebrochen
   if (code.trim() !== RESET_CODE) {
     showToast('❌ Falscher Code');
@@ -1466,6 +1467,46 @@ function showConfirmModal(message, opts) {
     cancelBtn.addEventListener('click', onCancel);
     overlay.addEventListener('click', onOverlay);
     overlay.classList.add('show');
+  });
+}
+// Wie showConfirmModal, aber mit einem Texteingabefeld für einen Code statt
+// eines reinen Ja/Nein — genutzt für die Reset-Bestätigung. Native prompt()
+// ist in manchen eingebetteten/PWA-Kontexten nicht verfügbar, daher ein
+// eigenes kleines Modal statt window.prompt().
+function showCodePromptModal(message) {
+  if (confirmOpen) return Promise.resolve(null);
+  confirmOpen = true;
+  const overlay = document.getElementById('confirmOverlay');
+  const okBtn = document.getElementById('confirmOkBtn');
+  const cancelBtn = document.getElementById('confirmCancelBtn');
+  const input = document.getElementById('confirmCodeInput');
+  document.getElementById('confirmMessage').textContent = message;
+  okBtn.textContent = 'OK';
+  cancelBtn.textContent = 'Abbrechen';
+  okBtn.classList.remove('danger');
+  input.value = '';
+  input.classList.remove('hidden');
+  return new Promise((resolve) => {
+    function cleanup(result) {
+      confirmOpen = false;
+      overlay.classList.remove('show');
+      input.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlay);
+      input.removeEventListener('keydown', onKeydown);
+      resolve(result);
+    }
+    function onOk() { cleanup(input.value); }
+    function onCancel() { cleanup(null); }
+    function onOverlay(e) { if (e.target === overlay) cleanup(null); }
+    function onKeydown(e) { if (e.key === 'Enter') { e.preventDefault(); cleanup(input.value); } }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlay);
+    input.addEventListener('keydown', onKeydown);
+    overlay.classList.add('show');
+    setTimeout(() => input.focus(), 50);
   });
 }
 function showCrushToast(label) {
