@@ -762,7 +762,7 @@
 
     <div id="chatSendErr" class="err-msg" style="margin:0 16px;"></div>
     <div class="chat-input-row hidden" id="chatInputRow">
-      <input id="chatInput" type="text" placeholder="Nachricht…">
+      <input id="chatInput" type="text" maxlength="500" placeholder="Nachricht…">
       <button id="chatSendBtn">➤</button>
     </div>
 
@@ -807,7 +807,10 @@ const FRIENDLY_ERRORS = [
   { match: 'invalid_target', text: 'Diese Person ist nicht (mehr) verfügbar.' },
   { match: 'empty_content', text: 'Bitte etwas eingeben.' },
   { match: 'dj_paused', text: 'Der DJ pausiert gerade neue Musikwünsche – schau später nochmal vorbei!' },
+  { match: 'message_rate_limited', text: 'Puh, das ging schnell 😅 – kurz warten und weiterschreiben.' },
+  { match: 'extra_rate_limited', text: 'Kurz durchatmen 😅 – gleich nochmal versuchen.' },
   { match: 'rate_limited', text: 'Kurz durchatmen 😅 – gleich wieder weiterswipen.' },
+  { match: 'content_too_long', text: 'Das ist leider zu lang – bitte kürzer fassen.' },
   { match: 'auth_failed', text: 'Anmeldung gerade nicht möglich. Bitte kurz beim Team melden.' },
 ];
 function formatRelativeTime(iso) {
@@ -1832,7 +1835,7 @@ function toggleInvitePanel(panel, matchId, afterSend) {
     } catch (e) {
       panel.style.pointerEvents = '';
       statusEl.innerHTML =
-        '<div class="invite-status-msg error">😅 Konnte nicht gesendet werden. (' + esc(e.message || String(e)) + ')</div>' +
+        '<div class="invite-status-msg error">😅 ' + esc(friendlyErrorMessage(e)) + '</div>' +
         '<button type="button" class="secondary-btn invite-retry-btn">Nochmal versuchen</button>';
       statusEl.className = 'invite-status error';
       document.querySelectorAll('#' + containerId + ' .chip').forEach(c => c.classList.remove('selected'));
@@ -1944,7 +1947,7 @@ document.getElementById('chatSendBtn').addEventListener('click', async () => {
     await loadChatMessages();
   } catch (e) {
     input.value = content;
-    errEl.textContent = 'Nicht gesendet – nochmal versuchen. (' + (e.message || e) + ')';
+    errEl.textContent = friendlyErrorMessage(e);
   } finally {
     btn.disabled = false;
   }
@@ -2592,6 +2595,16 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.2.2 (2026-09-20):
+  - Serverseitiges Rate-Limit + Längenlimit fuer Chat-Nachrichten (max. 500
+    Zeichen, max. 20 Nachrichten/10s pro Person -- per BEFORE INSERT Trigger
+    auf messages, da der Versand als direktes Table-Insert laeuft statt ueber
+    ein RPC) und fuer Shoutouts/Songwuensche/Club-Challenges (max. 200
+    Zeichen, max. 8 Eintraege/60s pro Gast, in submit_extra()). Beides war
+    zuvor nur clientseitig begrenzt (maxlength) und liess sich per direktem
+    API-Call umgehen -- gleiches Haertungsmuster wie beim bestehenden
+    Swipe-Rate-Limit.
 
   Version 1.2.1 (2026-09-20):
   - Login-Screen: Reset-Button wieder dezenter gemacht (kleine graue
