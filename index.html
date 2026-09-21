@@ -711,7 +711,7 @@
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.2 · 2026</div>
+    <div class="version-footer">Version 1.2.4 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -2036,7 +2036,7 @@ function renderProfileView() {
       returnToLogin('Du bist ausgecheckt. Bis bald 💜');
     } catch (e) {
       btn.disabled = false;
-      alert('Fehler: ' + friendlyErrorMessage(e));
+      showToast('❌ ' + friendlyErrorMessage(e));
     }
   });
 }
@@ -2202,7 +2202,7 @@ function renderProfileEdit() {
       returnToLogin('Du bist ausgecheckt. Bis bald 💜');
     } catch (e) {
       btn.disabled = false;
-      alert('Fehler: ' + friendlyErrorMessage(e));
+      showToast('❌ ' + friendlyErrorMessage(e));
     }
   });
   document.getElementById('saveProfileBtn').addEventListener('click', async (ev) => {
@@ -2615,6 +2615,15 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.2.4 (2026-09-21):
+  - Review-Runde (Code/Design/Darstellung): Auschecken-Fehler nutzte an zwei
+    Stellen noch das native alert() statt des App-eigenen Toast-Systems --
+    gleiche Kategorie Bug wie window.prompt() vorher (in eingebetteten/PWA-
+    Kontexten nicht zuverlaessig sichtbar). Jetzt konsistent showToast(),
+    wie ueberall sonst im Code. Sonst: voller visueller Durchgang auf
+    echter Mobil-Viewportgroesse (375x812) fuer Gast-App und DJ-Seite,
+    keine weiteren Auffaelligkeiten gefunden.
 
   Version 1.2.3 (2026-09-20):
   - Kritischer Bugfix: Chat hat waehrend des Offenseins nie neue Nachrichten
