@@ -711,7 +711,7 @@
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.2.4 · 2026</div>
+    <div class="version-footer">Version 1.2.5 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -2615,6 +2615,19 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.2.5 (2026-09-21):
+  - Zweite, staerker skeptische Review-Runde (auf Wunsch, weil vorherige
+    Runden wiederholt noch Fehler fanden): unabhaengiger Zweit-Review durch
+    einen separaten Agenten ohne Vorwissen, plus systematischer Grep-Audit
+    ueber beide Dateien nach der gleichen Bug-Klasse wie zuvor (native
+    Browser-APIs, die in eingebetteten/PWA-Kontexten lautlos versagen
+    koennen) sowie nach unbehandelten Promises und clientseitig-only
+    validierten Schreibpfaden. Fund: dj/index.html hatte noch zwei rohe
+    alert()-Aufrufe (Pause/Annehmen-Fehler), die beim gleichen Fix in
+    index.html (1.2.4) übersehen wurden -- jetzt durch ein kleines
+    Toast-System + Fehler-Uebersetzung ersetzt, analog zur Gast-App.
+    Sonst keine weiteren Funde dieser Art in beiden Dateien.
 
   Version 1.2.4 (2026-09-21):
   - Review-Runde (Code/Design/Darstellung): Auschecken-Fehler nutzte an zwei

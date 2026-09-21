@@ -254,6 +254,37 @@ function normalizeInstagramHandle(input) {
   return String(input || '').trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
 }
 
+// Kleines Toast-System fuer Fehler, analog zur Gast-App (index.html) --
+// alert() wurde dort schon aus dem gleichen Grund ersetzt: in
+// eingebetteten/PWA-Kontexten kann alert() lautlos nichts anzeigen, und die
+// DJ-Person saehe dann ueberhaupt keine Rueckmeldung auf einen Fehlklick.
+let djToastTimer = null;
+function showDjToast(text) {
+  let el = document.getElementById('djToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'djToast';
+    el.style.cssText = 'position:fixed; left:50%; bottom:22px; transform:translateX(-50%); max-width:90vw; background:#1c1626; border:1.5px solid #4a2f38; color:#ff9fc4; font-weight:700; font-size:14px; padding:12px 18px; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,0.4); z-index:9999; text-align:center;';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.style.display = 'block';
+  clearTimeout(djToastTimer);
+  djToastTimer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+
+// Uebersetzt die vom Backend geworfenen Fehler-Codes (siehe RPC-Definitionen
+// dj_set_accepting / dj_set_song_status) in verstaendlichen Text, statt der
+// Gast-App-Praxis zu widersprechen, die nie rohe Postgres-Fehler zeigt.
+function djFriendlyError(e) {
+  const raw = String((e && e.message) || e || '');
+  if (raw.includes('invalid_dj_code')) return 'Zugang abgelaufen. Bitte Seite neu laden.';
+  if (raw.includes('invalid_status')) return 'Ungueltiger Status.';
+  if (raw.includes('not_found')) return 'Dieser Songwunsch wurde bereits von jemand anderem bearbeitet.';
+  if (raw.includes('network_error') || /fetch|network/i.test(raw)) return 'Kein Netz gerade -- bitte nochmal versuchen.';
+  return 'Fehler -- bitte nochmal versuchen.';
+}
+
 let eventId = null;
 let djCode = null;
 const DJ_CODE_KEY = 'crush_dj_code';
@@ -341,7 +372,7 @@ document.getElementById('djPauseBtn').addEventListener('click', async () => {
     const accepting = await callRpc('dj_set_accepting', { p_event_id: eventId, p_code: djCode, p_accepting: wanted });
     renderStatusBar(typeof accepting === 'boolean' ? accepting : wanted);
   } catch (e) {
-    alert('Fehler: ' + (e.message || e));
+    showDjToast('❌ ' + djFriendlyError(e));
   } finally {
     btn.disabled = false;
   }
@@ -422,7 +453,7 @@ async function setStatus(id, status, srcBtn) {
   } catch (e) {
     busyDecisions--;
     btns.forEach(b => b.disabled = false);
-    alert('Fehler: ' + (e.message || e));
+    showDjToast('❌ ' + djFriendlyError(e));
   }
 }
 
