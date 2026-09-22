@@ -75,7 +75,35 @@
 
   /* Login */
   .login-wrap { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 20px 24px; overflow-y: auto; }
-  .login-wrap h2 { text-align: center; margin: 0 0 4px; font-size: 20px; color: #fff; }
+  .login-wrap h2 { text-align: center; margin: 0 0 4px; font-size: 22px; color: #fff; }
+  /* Startseite: Glow-Hintergrund + aktuelles Event */
+  #loginScreen { position: relative; }
+  #loginScreen::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(circle at 15% 12%, rgba(255,61,129,0.28), transparent 42%),
+      radial-gradient(circle at 88% 30%, rgba(139,92,246,0.24), transparent 45%),
+      radial-gradient(circle at 50% 100%, rgba(61,155,255,0.18), transparent 50%);
+  }
+  #loginScreen > * { position: relative; z-index: 1; }
+  #loginScreen .brandbar { filter: drop-shadow(0 0 18px rgba(255,61,129,0.45)); }
+  .login-tagline { text-align: center; color: #c9bfd9; font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; margin-top: -6px; flex-shrink: 0; }
+  .event-card {
+    margin: 0 0 20px; padding: 16px 16px 14px; border-radius: 18px; text-align: center;
+    background: linear-gradient(145deg, rgba(255,61,129,0.16), rgba(139,92,246,0.14) 55%, rgba(61,155,255,0.12));
+    border: 1px solid rgba(255,61,129,0.35);
+    box-shadow: 0 0 28px rgba(255,61,129,0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .event-live { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.14em; color: #ff7aa8; background: rgba(255,61,129,0.14); padding: 4px 10px; border-radius: 999px; }
+  .event-live .dot { width: 7px; height: 7px; border-radius: 50%; background: #ff3d81; box-shadow: 0 0 8px #ff3d81; animation: liveBlink 1.4s ease-in-out infinite; }
+  @keyframes liveBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .event-card.soon { border-color: rgba(139,92,246,0.35); box-shadow: 0 0 22px rgba(139,92,246,0.15); }
+  .event-card.soon .event-live { color: #b69cff; background: rgba(139,92,246,0.16); }
+  .event-card.soon .event-live .dot { background: #8b5cf6; box-shadow: 0 0 8px #8b5cf6; animation: none; }
+  .event-name { margin-top: 10px; font-size: 24px; font-weight: 800; color: #fff; line-height: 1.2; word-break: break-word; }
+  .event-meta { margin-top: 6px; font-size: 13px; color: #c9bfd9; }
+  .event-dj { margin-top: 4px; font-size: 12px; color: #9b8fae; }
+  @media (prefers-reduced-motion: reduce) { .event-live .dot { animation: none; } }
   .login-wrap p.sub { text-align: center; color: #9b8fae; font-size: 13.5px; line-height: 1.6; margin: 0 0 22px; }
   label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9b8fae; display: block; margin-top: 10px; }
   label .label-optional { font-weight: 400; text-transform: none; letter-spacing: normal; color: #695d7d; }
@@ -691,9 +719,16 @@
 
   <div class="screen" id="loginScreen">
     <div class="brandbar">CRUSH</div>
+    <div class="login-tagline">Die Flirt Party</div>
     <div class="login-wrap">
-      <h2>Willkommen</h2>
-      <p class="sub" id="loginSub">Gib deinen Crush Name ein</p>
+      <div id="eventCard" class="event-card hidden">
+        <div class="event-live"><span class="dot"></span><span id="eventLiveText">CHECK-IN OFFEN</span></div>
+        <div class="event-name" id="eventName"></div>
+        <div class="event-meta" id="eventMeta"></div>
+        <div class="event-dj hidden" id="eventDj"></div>
+      </div>
+      <h2>Bereit für deinen Crush? 💘</h2>
+      <p class="sub" id="loginSub">Gib deinen Crush Name ein und los geht's</p>
 
       <div id="loginFormArea">
         <label for="loginQr">Crush Name</label>
@@ -707,7 +742,7 @@
         </div>
       </div>
       <div id="noEventNotice" class="hidden" style="text-align:center; padding:26px 6px; color:#9b8fae; font-size:13.5px; line-height:1.6;">
-        📅 Aktuell ist kein Event offen.<br>Schau kurz vor Beginn nochmal vorbei!
+        Der Check-in ist noch nicht offen.<br>Schau kurz vor Beginn nochmal vorbei! 💜
       </div>
     </div>
     <!-- Bewusst sehr dezent (kleine graue Textzeile statt Button) und per Code
@@ -1068,10 +1103,35 @@ document.getElementById('newIdentityLink').addEventListener('click', async () =>
 let cachedActiveEventId = null;
 async function getActiveEventId(force) {
   if (cachedActiveEventId && !force) return cachedActiveEventId;
-  const { data, error } = await sb.from('events').select('id').in('status', ['checkin_open','running']).order('event_date', { ascending: false }).limit(1);
+  const { data, error } = await sb.from('events').select('id, name, status, event_date, venue, city, dj_name').in('status', ['checkin_open','running']).order('event_date', { ascending: false }).limit(1);
   if (error) throw new Error(error.message);
   cachedActiveEventId = (data && data[0]) ? data[0].id : null;
+  renderEventCard(data && data[0]);
   return cachedActiveEventId;
+}
+
+// Zeigt auf der Startseite, bei welchem Event man gerade eincheckt.
+function renderEventCard(ev) {
+  const card = document.getElementById('eventCard');
+  if (!card) return;
+  if (!ev) { card.classList.add('hidden'); return; }
+  let dateTxt = '';
+  if (ev.event_date) {
+    const d = new Date(ev.event_date + 'T12:00:00');
+    if (!isNaN(d.getTime())) {
+      const wd = ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()];
+      dateTxt = wd + ' ' + String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.';
+    }
+  }
+  const place = [ev.venue, ev.city].filter(Boolean).join(', ');
+  document.getElementById('eventLiveText').textContent = ev.status === 'running' ? 'LIVE · JETZT EINCHECKEN' : ev.status === 'upcoming' ? 'NÄCHSTES EVENT' : 'CHECK-IN OFFEN';
+  card.classList.toggle('soon', ev.status === 'upcoming');
+  document.getElementById('eventName').textContent = ev.name || 'CRUSH Event';
+  document.getElementById('eventMeta').textContent = ['📅 ' + dateTxt, place ? '📍 ' + place : ''].filter(x => x && x !== '📅 ').join('   ');
+  const dj = document.getElementById('eventDj');
+  dj.textContent = ev.dj_name ? '🎧 ' + ev.dj_name : '';
+  dj.classList.toggle('hidden', !ev.dj_name);
+  card.classList.remove('hidden');
 }
 
 async function checkActiveEvent() {
@@ -1080,6 +1140,13 @@ async function checkActiveEvent() {
     const eventId = await getActiveEventId(true);
     document.getElementById('loginFormArea').classList.toggle('hidden', !eventId);
     document.getElementById('noEventNotice').classList.toggle('hidden', !!eventId);
+    if (!eventId) {
+      // Kein Check-in offen: das nächste geplante Event als Vorschau zeigen.
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+      const { data: next } = await sb.from('events').select('id, name, status, event_date, venue, city, dj_name').eq('status', 'upcoming').gte('event_date', iso).order('event_date', { ascending: true }).limit(1);
+      if (!cachedActiveEventId) renderEventCard(next && next[0]);
+    }
   } catch (e) {
     console.error(e);
     // fail open: leave the login form visible on a transient error rather
