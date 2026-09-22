@@ -107,9 +107,11 @@
   .avatar-picker { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 8px; }
   .avatar-picker-btns { display: flex; gap: 10px; width: 100%; }
   .avatar-picker-btn {
-    flex: 1; text-align: center; padding: 11px 10px; border-radius: 12px;
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 11px 10px; border-radius: 12px;
     border: 1px solid #362c47; background: #1c1626; color: #c9a7ff;
     font-size: 13px; font-weight: 700; cursor: pointer; user-select: none;
+    box-sizing: border-box; line-height: 1.3;
   }
   .avatar-picker-btn:active { transform: scale(0.97); }
   .avatar-emoji-input {
@@ -598,6 +600,7 @@
   }
   .tabbar button .icon { font-size: 20px; display: block; margin-bottom: 2px; }
   .tabbar button.active { color: #ff3d81; }
+  .tabbar button.locked { opacity: 0.35; pointer-events: none; }
   .loading {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
     text-align: center; color: #9b8fae; font-size: 14.5px; line-height: 1.6; padding: 28px 0;
@@ -711,7 +714,7 @@
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.2.5 · 2026</div>
+    <div class="version-footer">Version 1.3 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -1185,6 +1188,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     document.getElementById('mainScreen').classList.remove('hidden');
     maybeShowA2HSBanner();
     if (isNew) {
+      setFirstTimeSetupLock(true);
       await showTab('profile');
       renderProfileEdit();
     } else {
@@ -1198,6 +1202,19 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 });
 
 // ---------- Tabs ----------
+// Waehrend der allerersten Profil-Erstellung (nach dem allerersten Check-in,
+// bevor das Profil zum ersten Mal gespeichert wurde) sind Swipe/Crushes/Extras
+// noch nicht sinnvoll nutzbar (kein Profil vorhanden) -- grau ausgeblendet und
+// nicht antippbar, damit niemand aus Versehen dorthin navigiert und sich
+// wundert, warum dort noch nichts ist.
+let firstTimeSetupActive = false;
+function setFirstTimeSetupLock(active) {
+  firstTimeSetupActive = active;
+  document.querySelectorAll('#tabbar button').forEach(b => {
+    b.classList.toggle('locked', active && b.dataset.tab !== 'profile');
+  });
+}
+
 async function showTab(tab) {
   const sendErr = document.getElementById('chatSendErr');
   if (sendErr) sendErr.textContent = '';
@@ -1213,7 +1230,10 @@ async function showTab(tab) {
 }
 
 document.querySelectorAll('#tabbar button').forEach(b => {
-  b.addEventListener('click', () => showTab(b.dataset.tab));
+  b.addEventListener('click', () => {
+    if (firstTimeSetupActive && b.dataset.tab !== 'profile') return;
+    showTab(b.dataset.tab);
+  });
 });
 
 // ---------- Swipe ----------
@@ -2236,6 +2256,7 @@ function renderProfileEdit() {
         p_photo_url: (photoChanged && pendingPhotoDataUrl) ? pendingPhotoDataUrl : null
       });
       currentProfile = savedProfile;
+      if (firstTimeSetupActive) setFirstTimeSetupLock(false);
       renderProfileView();
       showToast('✅ Profil gespeichert');
     } catch (e) {
@@ -2254,6 +2275,7 @@ function renderProfileEdit() {
           const saved = rows2 && rows2[0];
           if (saved && saved.name === name && saved.qr_code === qrCode) {
             currentProfile = saved;
+            if (firstTimeSetupActive) setFirstTimeSetupLock(false);
             renderProfileView();
             showToast('✅ Profil gespeichert');
             return;
@@ -2303,7 +2325,7 @@ async function renderExtras() {
       <div class="extras-nav-item ${extrasSubtab === 'shoutout' ? 'selected' : ''}" data-sub="shoutout"><span class="nav-icon">💌</span>Shoutouts</div>
       <div class="extras-nav-item ${extrasSubtab === 'game' ? 'selected' : ''}" data-sub="game"><span class="nav-icon">🔀</span>Zufalls-Match</div>
       <div class="extras-nav-item ${extrasSubtab === 'screenmsg' ? 'selected' : ''}" data-sub="screenmsg"><span class="nav-icon">📺</span>Screen-Message</div>
-      <div class="extras-nav-item ${extrasSubtab === 'challenge' ? 'selected' : ''}" data-sub="challenge"><span class="nav-icon">🏆</span>Club Challenge</div>
+      <div class="extras-nav-item ${extrasSubtab === 'challenge' ? 'selected' : ''}" data-sub="challenge"><span class="nav-icon">🏆</span>Event Challenge</div>
       <div class="extras-nav-item ${extrasSubtab === 'guestlist' ? 'selected' : ''}" data-sub="guestlist"><span class="nav-icon">🎟️</span>Gästeliste</div>
     </div>
     <div id="extrasSubarea"><div class="loading">Lade…</div></div>
@@ -2335,8 +2357,8 @@ async function renderExtrasSubtab() {
   if (extrasSubtab === 'song') return renderPostsExtra(el, 'song', '🎵', 'Musikwunsch', 'Dein Wunsch', 'z.B. Interpret – Songtitel', '📀 Wünsche bisher');
   if (extrasSubtab === 'shoutout') return renderPostsExtra(el, 'shoutout', '💌', 'Shoutout', 'Deine Nachricht', 'Sag was Nettes an alle…', '💬 Shoutouts bisher');
   if (extrasSubtab === 'game') return renderGameExtra(el);
-  if (extrasSubtab === 'screenmsg') return renderComingSoonExtra(el, '📺', 'Screen-Message', 'Schick eine Nachricht direkt auf die Club-Screens – für alle sichtbar.');
-  if (extrasSubtab === 'challenge') return renderPostsExtra(el, 'challenge', '🏆', 'Club Challenge', 'Deine Challenge', 'z.B. Shots für alle an der Bar!', '🏆 Challenges bisher');
+  if (extrasSubtab === 'screenmsg') return renderComingSoonExtra(el, '📺', 'Screen-Message', 'Schick eine Nachricht direkt auf die Event-Screens – für alle sichtbar.');
+  if (extrasSubtab === 'challenge') return renderPostsExtra(el, 'challenge', '🏆', 'Event Challenge', 'Deine Challenge', 'z.B. Shots für alle an der Bar!', '🏆 Challenges bisher');
 }
 
 async function renderGuestlistExtra(el) {
@@ -2615,6 +2637,19 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.3 (2026-09-22):
+  - Profilbearbeitung: "Foto wählen" und "Emoji wählen" Buttons waren
+    unterschiedlich hoch (Label- vs. Div-Element ohne einheitliches
+    Flex-Alignment) -- jetzt gleiche Höhe.
+  - Bei der allerersten Profil-Erstellung direkt nach dem Check-in sind
+    Swipe/Crushes/Extras jetzt ausgegraut und nicht antippbar, bis das
+    Profil zum ersten Mal gespeichert wurde -- vorher liess sich aus
+    Versehen dorthin navigieren, obwohl dort ohne Profil noch nichts
+    Sinnvolles zu sehen war.
+  - "Club Challenge" umbenannt zu "Event Challenge" (auch die
+    Screen-Message-Beschreibung: "Event-Screens" statt "Club-Screens") --
+    Wording sollte nirgends mehr "Club" sagen.
 
   Version 1.2.5 (2026-09-21):
   - Zweite, staerker skeptische Review-Runde (auf Wunsch, weil vorherige
