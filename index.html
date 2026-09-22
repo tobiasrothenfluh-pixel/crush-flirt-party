@@ -1631,9 +1631,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       await showTab('swipe');
     }
   } catch (e) {
-    errEl.textContent = ((e && e.message) || '').includes('qr_code_already_claimed')
-      ? 'Dieser Crush Name ist schon vergeben. Bist du das und hast Handy oder Browser gewechselt? Kurz beim CRUSH-Team melden – wir schalten dich frei. Sonst einfach einen anderen Namen wählen.'
-      : friendlyErrorMessage(e);
+    errEl.textContent = friendlyErrorMessage(e);
   } finally {
     btn.disabled = false;
   }
