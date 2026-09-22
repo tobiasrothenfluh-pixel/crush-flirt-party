@@ -244,7 +244,8 @@
     background: linear-gradient(90deg, #f72a85, #8b5cf6);
     border-color: transparent;
     color: #fff;
-    font-weight: 700;
+    /* nicht fett: sonst wird der Chip breiter und die Reihe springt um */
+    text-shadow: 0 0 0.7px #fff;
   }
   .chip:active { transform: scale(0.93); }
   .chip-add { border-style: dashed; color: #a99bc4; }
@@ -1191,8 +1192,8 @@ const ICEBREAKER_SUGGESTIONS = [
   'Du siehst aus wie jemand, der gute Musik UND gute Gespräche mag.',
   'Letzte Warnung: Wenn du antwortest, flirte ich schamlos weiter.'
 ];
-const INTEREST_EMOJI = { reisen: '🌍 Reisen', sport: '⚽ Sport', kochen: '🍳 Kochen', kunst: '🎨 Kunst', fotografie: '📸 Fotografie', gaming: '🎮 Gaming', lesen: '📚 Lesen', fitness: '💪 Fitness', film: '🎬 Film', natur: '🌿 Natur' };
-const MUSIC_EMOJI = { techno: '🎧 Techno', house: '🏠 House', hiphop: '🎤 HipHop', pop: '🎵 Pop', rock: '🎸 Rock', indie: '🎹 Indie', rnb: '🎷 R&B', edm: '🪩 EDM' };
+const INTEREST_EMOJI = { party: '🎉 Party', reisen: '🌍 Reisen', sport: '⚽ Sport', kochen: '🍳 Kochen', kunst: '🎨 Kunst', fotografie: '📸 Fotografie', gaming: '🎮 Gaming', lesen: '📚 Lesen', fitness: '💪 Fitness', film: '🎬 Film', natur: '🌿 Natur' };
+const MUSIC_EMOJI = { wiesn: '🥨 Wiesn Hits', techno: '🎧 Techno', house: '🏠 House', hiphop: '🎤 HipHop', pop: '🎵 Pop', rock: '🎸 Rock', indie: '🎹 Indie', rnb: '🎷 R&B', edm: '🪩 EDM' };
 const DRINK_EMOJI = { bier: '🍺 Bier', wein: '🍷 Wein', cocktail: '🍸 Cocktail', gintonic: '🍹 Gin Tonic', prosecco: '🥂 Prosecco', whisky: '🥃 Whisky', alkoholfrei: '🚱 Alkoholfrei', shots: '🍾 Shots' };
 const LOOKING_FOR_LABEL = { offen: 'Offen', flirt: 'Flirt', freundschaft: 'Freundschaft', beziehung: 'Beziehung', one_night_stand: 'One Night Stand 🔥', ueberrasch_mich: 'Überrasch mich 🎲', tanzpartner: 'Tanzpartner für heute 💃' };
 function labelFor(map, key) { return map[key] || key; }
