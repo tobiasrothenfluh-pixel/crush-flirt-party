@@ -844,7 +844,13 @@
   .tabbar button.active .icon { transform: translateY(-1px) scale(1.12); filter: drop-shadow(0 0 8px rgba(247,42,133,0.7)); }
   @media (prefers-reduced-motion: reduce) { .swipe-photo::after, #swipeCrush { animation: none; } }
   /* Wischen: Karte folgt dem Finger, Stempel zeigen die Richtung */
-  #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none; }
+  #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none;
+    /* kein Glas-Blur auf der bewegten Karte – das ruckelt auf dem iPhone */
+    -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(160deg, #221a30, #17111f); transform: translate3d(0,0,0); }
+  #swipeArea .swipe-card.dragging { box-shadow: 0 10px 24px rgba(0,0,0,0.4); }
+  #swipeArea .swipe-card { animation: cardIn .3s cubic-bezier(.2,.9,.3,1.1); }
+  @keyframes cardIn { from { opacity: 0; transform: translate3d(0,10px,0) scale(.94); } to { opacity: 1; transform: translate3d(0,0,0); } }
+  #swipeArea .swipe-card.dragging .swipe-photo::after { animation: none; opacity: 0; }
   .swipe-stamp { position: absolute; top: 22px; padding: 6px 14px; border-radius: 12px; font-size: 22px; font-weight: 900; letter-spacing: .06em;
     opacity: 0; pointer-events: none; z-index: 3; border: 3px solid currentColor; background: rgba(10,7,16,0.35); }
   .swipe-stamp.like { left: 18px; color: #fff; border-color: #fff; background: rgba(247,42,133,0.55); transform: rotate(-14deg); text-shadow: 0 0 12px rgba(247,42,133,0.8); box-shadow: 0 0 18px rgba(247,42,133,0.5); }
@@ -1791,7 +1797,6 @@ async function loadNextCandidate() {
         <button class="btn-no" id="swipeNo">✕ No</button>
         <button class="btn-crush" id="swipeCrush">💗 Crush</button>
       </div>
-      <div class="swipe-hint">👉 Karte nach rechts wischen = Crush · nach links = No</div>
       <label for="icebreakerInput" style="margin-top:14px;">Flirt-Spruch mitschicken <span class="label-optional">Optional</span></label>
       <input id="icebreakerInput" type="text" placeholder="Nur sichtbar bei einem Match…">
       <div style="text-align:left; margin-top:4px;">
@@ -1820,7 +1825,7 @@ function enableCardDrag() {
   card.style.touchAction = 'pan-y';
   card.insertAdjacentHTML('beforeend', '<div class="swipe-stamp like">CRUSH 💗</div><div class="swipe-stamp nope">NOPE ✕</div>');
   const like = card.querySelector('.swipe-stamp.like'), nope = card.querySelector('.swipe-stamp.nope');
-  let sx = 0, sy = 0, dx = 0, dragging = false, pid = null, done = false;
+  let sx = 0, sy = 0, dx = 0, dragging = false, pid = null, done = false, raf = 0;
   const clamp = v => Math.max(0, Math.min(1, v));
   card.addEventListener('pointerdown', e => {
     if (done || (e.pointerType === 'mouse' && e.button !== 0)) return;
@@ -1831,29 +1836,35 @@ function enableCardDrag() {
     const mx = e.clientX - sx, my = e.clientY - sy;
     if (!dragging) {
       if (Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my) * 1.2) {
-        dragging = true; card.style.transition = 'none';
+        dragging = true; card.style.transition = 'none'; card.classList.add('dragging');
         try { card.setPointerCapture(pid); } catch (err) {}
       } else return;
     }
     dx = mx;
-    card.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 18) + 'deg)';
-    like.style.opacity = clamp(dx / 100); nope.style.opacity = clamp(-dx / 100);
+    if (!raf) raf = requestAnimationFrame(() => {
+      raf = 0;
+      card.style.transform = 'translate3d(' + dx + 'px,0,0) rotate(' + (dx / 18) + 'deg)';
+      like.style.opacity = clamp(dx / 100); nope.style.opacity = clamp(-dx / 100);
+    });
+    if (e.cancelable) e.preventDefault();
   });
   const end = () => {
     if (!dragging) { pid = null; return; }
     dragging = false; pid = null;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    card.classList.remove('dragging');
     const threshold = Math.min(110, card.offsetWidth * 0.28);
     if (Math.abs(dx) > threshold) {
       done = true;
       const dir = dx > 0 ? 1 : -1;
       card.style.transition = 'transform .3s ease-out, opacity .3s ease-out';
-      card.style.transform = 'translateX(' + (dir * window.innerWidth * 1.2) + 'px) rotate(' + (dir * 24) + 'deg)';
+      card.style.transform = 'translate3d(' + (dir * window.innerWidth * 1.2) + 'px,0,0) rotate(' + (dir * 24) + 'deg)';
       card.style.opacity = '0';
       feedbackTap();
       setTimeout(() => doSwipe(dir > 0 ? 'crush' : 'pass'), 230);
     } else {
       card.style.transition = 'transform .28s cubic-bezier(.2,.9,.3,1.2)';
-      card.style.transform = '';
+      card.style.transform = 'translate3d(0,0,0)';
       like.style.opacity = 0; nope.style.opacity = 0;
     }
   };
