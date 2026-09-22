@@ -896,6 +896,16 @@
   .match-item:nth-child(5), .extras-nav-item:nth-child(5) { animation-delay: .16s; }
   .match-item:nth-child(6), .extras-nav-item:nth-child(6) { animation-delay: .2s; }
   .match-item:nth-child(n+7) { animation-delay: .24s; }
+  /* Extras-Kacheln: Antippen federt, der Inhalt darunter gleitet mit */
+  .extras-nav-item { transition: background .3s ease, box-shadow .3s ease, color .2s ease, transform .16s ease; }
+  .extras-nav-item:active { transform: scale(.95); }
+  .extras-nav-item.selected { animation: tilePop .42s cubic-bezier(.2,.9,.28,1.5) both; }
+  @keyframes tilePop { 0% { transform: scale(.92); } 55% { transform: scale(1.06); } 100% { transform: scale(1); } }
+  #extrasSubarea.tab-in-r { animation: tabInR .3s cubic-bezier(.22,.9,.28,1) both; }
+  #extrasSubarea.tab-in-l { animation: tabInL .3s cubic-bezier(.22,.9,.28,1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .extras-nav-item.selected, #extrasSubarea.tab-in-r, #extrasSubarea.tab-in-l { animation: none; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .content.tab-in-r, .content.tab-in-l, .match-item, .extras-nav-item, .extras-card, .profile-card { animation: none; }
     .tab-ind { transition: opacity .2s ease; }
@@ -1123,7 +1133,7 @@ c-57 -19 -98 -136 -193 -552 -65 -288 -59 -331 51 -371 40 -15 80 0 94 34 6
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.5.6 · 2026</div>
+    <div class="version-footer">Version 1.5.7 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -3066,6 +3076,17 @@ function renderProfileEdit() {
 // ---------- Extras (Bonus-Bereich, passwortgeschützt) ----------
 const EXTRAS_REQUIRE_PASSWORD = false; let extrasUnlocked = !EXTRAS_REQUIRE_PASSWORD;
 let extrasSubtab = 'shoutout';
+// Beim Wechsel der Extras-Kachel gleitet der Bereich darunter in Wischrichtung herein.
+const EXTRAS_ORDER = ['song', 'shoutout', 'game', 'screenmsg', 'challenge', 'guestlist'];
+function animateExtrasSub(fromIdx) {
+  const el = document.getElementById('extrasSubarea');
+  if (!el) return;
+  const to = EXTRAS_ORDER.indexOf(extrasSubtab);
+  const dir = (fromIdx < 0 || to < 0 || to >= fromIdx) ? 1 : -1;
+  el.classList.remove('tab-in-r', 'tab-in-l');
+  void el.offsetWidth;
+  el.classList.add(dir > 0 ? 'tab-in-r' : 'tab-in-l');
+}
 async function renderExtras() {
   const area = document.getElementById('extrasArea');
   if (!extrasUnlocked) {
@@ -3101,7 +3122,19 @@ async function renderExtras() {
     <div id="extrasSubarea"><div class="loading">Lade…</div></div>
   `;
   document.querySelectorAll('#extrasSubnav .extras-nav-item').forEach(item => {
-    item.addEventListener('click', () => { extrasSubtab = item.dataset.sub; renderExtras(); });
+    item.addEventListener('click', async () => {
+      const sub = item.dataset.sub;
+      if (sub === extrasSubtab) return;
+      const from = EXTRAS_ORDER.indexOf(extrasSubtab);
+      extrasSubtab = sub;
+      document.querySelectorAll('#extrasSubnav .extras-nav-item').forEach(x => {
+        x.classList.remove('selected');
+        if (x.dataset.sub === sub) { void x.offsetWidth; x.classList.add('selected'); }
+      });
+      feedbackTap();
+      await renderExtrasSubtab();
+      animateExtrasSub(from);
+    });
   });
   await renderExtrasSubtab();
 }
@@ -3407,6 +3440,11 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.5.7 (2026-09-22):
+  - Extras-Kacheln: die angetippte Kachel federt auf, der Bereich darunter
+    gleitet in Wischrichtung herein; die Kacheln bleiben stehen statt neu
+    aufzubauen.
 
   Version 1.5.6 (2026-09-22):
   - Tab-Wechsel animiert: der Inhalt gleitet in Wischrichtung herein, ein
