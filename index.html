@@ -873,6 +873,17 @@
   .tab-badge.bump { animation: badgeBump .6s cubic-bezier(.2,.9,.3,1.4); }
   @keyframes badgeBump { 0% { transform: scale(.3); } 55% { transform: scale(1.35); } 100% { transform: scale(1); } }
   @media (prefers-reduced-motion: reduce) { .tab-badge.bump { animation: none; } }
+  /* Eigene Icons im Text/Buttons/Kacheln (statt Emojis) */
+  .ci { width: 1.15em; height: 1.15em; vertical-align: -0.22em; fill: none; stroke: currentColor; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  .ci .fillme { fill: currentColor; }
+  .ci.grad { stroke: url(#tabGrad); }
+  .ci.grad .fillme { fill: url(#tabGrad); }
+  .extras-nav-item svg.nav-icon { width: 26px; height: 26px; display: block; margin: 0 auto 4px; vertical-align: baseline; }
+  .extras-nav-item.selected svg.nav-icon { stroke: #fff; }
+  .extras-nav-item.selected svg.nav-icon .fillme { fill: #fff; }
+  .extras-card-head svg.emoji { width: 26px; height: 26px; }
+  .dj-now-banner svg.ci { vertical-align: -0.25em; }
   @media (prefers-reduced-motion: reduce) { .swipe-photo::after, #swipeCrush { animation: none; } }
   /* Wischen: Karte folgt dem Finger, Stempel zeigen die Richtung */
   #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y;
@@ -1084,7 +1095,7 @@ c-57 -19 -98 -136 -193 -552 -65 -288 -59 -331 51 -371 40 -15 80 0 94 34 6
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.5.3 · 2026</div>
+    <div class="version-footer">Version 1.5.4 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -1805,10 +1816,10 @@ function renderSwipeEmpty(area) {
       <h3 class="se-title"><span>Alle durchgeswiped!</span> 🔥</h3>
       <p class="se-sub">${esc(line)}</p>
       <div class="se-live"><span class="dot"></span>Wir halten Ausschau nach neuen Crushes…</div>
-      <button class="primary-btn se-btn" id="seReload">🔄 Nochmal schauen</button>
+      <button class="primary-btn se-btn" id="seReload">${ci('refresh')} Nochmal schauen</button>
       <div class="se-actions">
-        <button class="secondary-btn" id="seCrushes">💘 Meine Crushes</button>
-        <button class="secondary-btn" id="seSong">🎵 Songwunsch</button>
+        <button class="secondary-btn" id="seCrushes">${ci('heart', 'grad')} Meine Crushes</button>
+        <button class="secondary-btn" id="seSong">${ci('music', 'grad')} Songwunsch</button>
       </div>
     </div>`;
   document.getElementById('seReload').addEventListener('click', loadNextCandidate);
@@ -2143,6 +2154,11 @@ function showCodePromptModal(message) {
     setTimeout(() => input.focus(), 50);
   });
 }
+const CI_PATHS = {"music": "<path d=\"M9 17.5V5.4l10-2v10.2\"/><circle cx=\"6.6\" cy=\"18\" r=\"2.6\" class=\"fillme\"/><circle cx=\"16.6\" cy=\"16\" r=\"2.6\" class=\"fillme\"/>", "mail": "<path d=\"M4.2 9.6h3.2L15.8 5v14l-8.4-4.6H4.2A1.5 1.5 0 0 1 2.7 13v-1.9a1.5 1.5 0 0 1 1.5-1.5z\" class=\"fillme\"/><path d=\"M18.8 9.4a3.7 3.7 0 0 1 0 5.2\"/><path d=\"M21 7.2a6.8 6.8 0 0 1 0 9.6\"/><path d=\"M7.6 15.2v2.4a2 2 0 0 0 3.5 1.3\"/>", "shuffle": "<path d=\"M3 7.2h3.2c1.2 0 2.3.6 3 1.6l3.6 5.4c.7 1 1.8 1.6 3 1.6H21\"/><path d=\"M3 16.8h3.2c1.2 0 2.3-.6 3-1.6l.7-1.1\"/><path d=\"M14.1 9.5l.7-1.1c.7-1 1.8-1.6 3-1.6H21\"/><path d=\"M18.6 4.4 21 6.8l-2.4 2.4\"/><path d=\"M18.6 13.4 21 15.8l-2.4 2.4\"/>", "tv": "<rect x=\"3\" y=\"7\" width=\"18\" height=\"12.5\" rx=\"2.8\"/><path d=\"M8.6 3 12 6.2 15.4 3\"/><path d=\"M12 17c-1.9-1.3-3-2.3-3-3.5 0-.9.7-1.6 1.5-1.6.6 0 1.1.3 1.5.8.4-.5.9-.8 1.5-.8.8 0 1.5.7 1.5 1.6 0 1.2-1.1 2.2-3 3.5z\" class=\"fillme\"/>", "trophy": "<path d=\"M7.8 4h8.4v4.6a4.2 4.2 0 0 1-8.4 0z\" class=\"fillme\"/><path d=\"M7.8 5.6H5.4a2.6 2.6 0 0 0 2.6 4.6\"/><path d=\"M16.2 5.6h2.4a2.6 2.6 0 0 1-2.6 4.6\"/><path d=\"M12 12.8v3.4\"/><path d=\"M8.6 20.2h6.8\"/><path d=\"M9.8 20.2c0-1.7.8-2.6 2.2-2.6s2.2.9 2.2 2.6\"/>", "ticket": "<path d=\"M3.6 9.4V7.6A1.6 1.6 0 0 1 5.2 6h13.6a1.6 1.6 0 0 1 1.6 1.6v1.8a2.7 2.7 0 0 0 0 5.2v1.8a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6v-1.8a2.7 2.7 0 0 0 0-5.2z\"/><path d=\"M9.4 9.8v1.1M9.4 13.4v1.1\"/>", "headphones": "<path d=\"M4 15.4v-3.2a8 8 0 0 1 16 0v3.2\"/><rect x=\"2.6\" y=\"14\" width=\"4.6\" height=\"6.2\" rx=\"2.3\" class=\"fillme\"/><rect x=\"16.8\" y=\"14\" width=\"4.6\" height=\"6.2\" rx=\"2.3\" class=\"fillme\"/>", "instagram": "<rect x=\"3.6\" y=\"3.6\" width=\"16.8\" height=\"16.8\" rx=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"3.9\"/><circle cx=\"16.9\" cy=\"7.1\" r=\"1.15\" class=\"fillme\"/>", "disc": "<circle cx=\"12\" cy=\"12\" r=\"8.6\"/><circle cx=\"12\" cy=\"12\" r=\"2.4\" class=\"fillme\"/>", "chat": "<path d=\"M12 20.5l-3.6-2.6H6.5A3 3 0 0 1 3.5 15V7A3 3 0 0 1 6.5 4h11a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2z\"/><path d=\"M8 9h8M8 12.5h5\"/>", "refresh": "<path d=\"M20 12a8 8 0 1 1-2.5-5.8\"/><path d=\"M20.3 4.6v4.2h-4.2\"/>", "heart": "<path d=\"M12 20.2C6.9 16.9 4 14.1 4 10.6 4 8 6 6 8.5 6c1.5 0 2.8.7 3.5 1.9C12.7 6.7 14 6 15.5 6 18 6 20 8 20 10.6c0 3.5-2.9 6.3-8 9.6z\" class=\"fillme\"/>"};
+function ci(name, cls) {
+  return '<svg class="ci ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (CI_PATHS[name] || '') + '</svg>';
+}
+
 // ---------- Zähler auf dem Crushes-Icon ----------
 // "Neu" = Crush noch nie im Crushes-Tab gesehen; "ungelesen" = letzte Nachricht
 // kommt vom Gegenüber und ist neuer als das, was man im Chat schon gesehen hat.
@@ -2430,10 +2446,10 @@ async function loadMatches() {
           </div>
           <h3 class="se-title"><span>Dein erster Crush wartet</span> 💘</h3>
           <p class="se-sub">Sobald ihr euch gegenseitig crusht, erscheint ihr hier – und könnt direkt chatten.</p>
-          <button class="primary-btn se-btn" id="ceSwipe">💗 Jetzt swipen</button>
+          <button class="primary-btn se-btn" id="ceSwipe">${ci('heart')} Jetzt swipen</button>
           <div class="se-actions">
-            <button class="secondary-btn" id="ceRandom">🔀 Zufalls-Match</button>
-            <button class="secondary-btn" id="ceSong">🎵 Songwunsch</button>
+            <button class="secondary-btn" id="ceRandom">${ci('shuffle', 'grad')} Zufalls-Match</button>
+            <button class="secondary-btn" id="ceSong">${ci('music', 'grad')} Songwunsch</button>
           </div>
         </div>`;
       document.getElementById('ceSwipe').addEventListener('click', () => showTab('swipe'));
@@ -3013,12 +3029,12 @@ async function renderExtras() {
   }
   area.innerHTML = `
     <div class="extras-nav" id="extrasSubnav">
-      <div class="extras-nav-item ${extrasSubtab === 'song' ? 'selected' : ''}" data-sub="song"><span class="nav-icon">🎵</span>Musik</div>
-      <div class="extras-nav-item ${extrasSubtab === 'shoutout' ? 'selected' : ''}" data-sub="shoutout"><span class="nav-icon">💌</span>Shoutouts</div>
-      <div class="extras-nav-item ${extrasSubtab === 'game' ? 'selected' : ''}" data-sub="game"><span class="nav-icon">🔀</span>Zufalls-Match</div>
-      <div class="extras-nav-item ${extrasSubtab === 'screenmsg' ? 'selected' : ''}" data-sub="screenmsg"><span class="nav-icon">📺</span>Screen-Message</div>
-      <div class="extras-nav-item ${extrasSubtab === 'challenge' ? 'selected' : ''}" data-sub="challenge"><span class="nav-icon">🏆</span>Event Challenge</div>
-      <div class="extras-nav-item ${extrasSubtab === 'guestlist' ? 'selected' : ''}" data-sub="guestlist"><span class="nav-icon">🎟️</span>Gästeliste</div>
+      <div class="extras-nav-item ${extrasSubtab === 'song' ? 'selected' : ''}" data-sub="song">${ci('music', 'nav-icon')}Musik</div>
+      <div class="extras-nav-item ${extrasSubtab === 'shoutout' ? 'selected' : ''}" data-sub="shoutout">${ci('mail', 'nav-icon')}Shoutouts</div>
+      <div class="extras-nav-item ${extrasSubtab === 'game' ? 'selected' : ''}" data-sub="game">${ci('shuffle', 'nav-icon')}Zufalls-Match</div>
+      <div class="extras-nav-item ${extrasSubtab === 'screenmsg' ? 'selected' : ''}" data-sub="screenmsg">${ci('tv', 'nav-icon')}Screen-Message</div>
+      <div class="extras-nav-item ${extrasSubtab === 'challenge' ? 'selected' : ''}" data-sub="challenge">${ci('trophy', 'nav-icon')}Event Challenge</div>
+      <div class="extras-nav-item ${extrasSubtab === 'guestlist' ? 'selected' : ''}" data-sub="guestlist">${ci('ticket', 'nav-icon')}Gästeliste</div>
     </div>
     <div id="extrasSubarea"><div class="loading">Lade…</div></div>
   `;
@@ -3032,7 +3048,7 @@ function renderComingSoonExtra(el, icon, title, description) {
   el.innerHTML = `
     <div class="extras-card">
       <div class="extras-card-head">
-        <span class="emoji">${icon}</span>
+        ${icon}
         <div>
           <h4>${esc(title)}</h4>
           <p>${esc(description)}</p>
@@ -3046,11 +3062,11 @@ function renderComingSoonExtra(el, icon, title, description) {
 async function renderExtrasSubtab() {
   const el = document.getElementById('extrasSubarea');
   if (extrasSubtab === 'guestlist') return renderGuestlistExtra(el);
-  if (extrasSubtab === 'song') return renderPostsExtra(el, 'song', '🎵', 'Musikwunsch', 'Dein Wunsch', 'z.B. Interpret – Songtitel', '📀 Wünsche bisher');
-  if (extrasSubtab === 'shoutout') return renderPostsExtra(el, 'shoutout', '💌', 'Shoutout', 'Deine Nachricht', 'Sag was Nettes an alle…', '💬 Shoutouts bisher');
+  if (extrasSubtab === 'song') return renderPostsExtra(el, 'song', ci('music', 'grad'), 'Musikwunsch', 'Dein Wunsch', 'z.B. Interpret – Songtitel', ci('disc', 'grad') + ' Wünsche bisher');
+  if (extrasSubtab === 'shoutout') return renderPostsExtra(el, 'shoutout', ci('mail', 'grad'), 'Shoutout', 'Deine Nachricht', 'Sag was Nettes an alle…', ci('chat', 'grad') + ' Shoutouts bisher');
   if (extrasSubtab === 'game') return renderGameExtra(el);
-  if (extrasSubtab === 'screenmsg') return renderComingSoonExtra(el, '📺', 'Screen-Message', 'Schick eine Nachricht direkt auf die Event-Screens – für alle sichtbar.');
-  if (extrasSubtab === 'challenge') return renderPostsExtra(el, 'challenge', '🏆', 'Event Challenge', 'Deine Challenge', 'z.B. Shots für alle an der Bar!', '🏆 Challenges bisher');
+  if (extrasSubtab === 'screenmsg') return renderComingSoonExtra(el, ci('tv', 'grad'), 'Screen-Message', 'Schick eine Nachricht direkt auf die Event-Screens – für alle sichtbar.');
+  if (extrasSubtab === 'challenge') return renderPostsExtra(el, 'challenge', ci('trophy', 'grad'), 'Event Challenge', 'Deine Challenge', 'z.B. Shots für alle an der Bar!', ci('trophy', 'grad') + ' Challenges bisher');
 }
 
 async function renderGuestlistExtra(el) {
@@ -3065,7 +3081,7 @@ async function renderGuestlistExtra(el) {
     el.innerHTML = `
       <div class="extras-card">
         <div class="extras-card-head">
-          <span class="emoji">🎟️</span>
+          ${ci('ticket', 'emoji grad')}
           <div>
             <h4>Gästeliste</h4>
             <p>Für die nächste Crush-Party gratis dabei sein 🎉</p>
@@ -3138,8 +3154,8 @@ async function renderPostsExtra(el, kind, icon, title, formLabel, placeholder, l
       kind === 'song' ? getDjInfo() : Promise.resolve(null)
     ]);
     const djBanner = (dj && dj.dj_name)
-      ? '<div class="dj-now-banner">🎧 Heute an den Reglern: <strong>' + esc(dj.dj_name) + '</strong>' +
-        (instagramUrl(dj.dj_instagram) ? ' <a href="' + esc(instagramUrl(dj.dj_instagram)) + '" target="_blank" rel="noopener">📷 Instagram</a>' : '') +
+      ? '<div class="dj-now-banner">' + ci('headphones', 'grad') + ' Heute an den Reglern: <strong>' + esc(dj.dj_name) + '</strong>' +
+        (instagramUrl(dj.dj_instagram) ? ' <a href="' + esc(instagramUrl(dj.dj_instagram)) + '" target="_blank" rel="noopener">' + ci('instagram') + ' Instagram</a>' : '') +
         '</div>'
       : '';
     // Song submissions can be paused by the DJ (events.dj_accepting_requests).
@@ -3150,7 +3166,7 @@ async function renderPostsExtra(el, kind, icon, title, formLabel, placeholder, l
       ? '<div class="dj-paused-banner">⏸ Der DJ pausiert gerade neue Musikwünsche. Schau später nochmal vorbei!</div>'
       : `<div class="extras-card">
           <div class="extras-card-head">
-            <span class="emoji">${icon}</span>
+            ${icon}
             <div><h4>${esc(title)}</h4></div>
           </div>
           <label for="extrasPostInput">${esc(formLabel)}</label>
@@ -3161,7 +3177,7 @@ async function renderPostsExtra(el, kind, icon, title, formLabel, placeholder, l
     el.innerHTML = `
       ${djBanner}
       ${formHtml}
-      <div class="icebreaker-label" style="margin-top:18px;">${esc(listLabel)}</div>
+      <div class="icebreaker-label" style="margin-top:18px;">${listLabel}</div>
       <div id="extrasPostList">${rows.length
         ? '<div class="profile-card extras-post-list">' + rows.map(r => {
             const statusBadge = (kind === 'song' && r.status && r.status !== 'pending')
@@ -3220,12 +3236,12 @@ function renderGameExtra(el) {
   el.innerHTML = `
     <div class="extras-card" style="text-align:center;">
       <div class="extras-card-head" style="justify-content:center;">
-        <span class="emoji">🔀</span>
+        ${ci('shuffle', 'emoji grad')}
         <div><h4>Zufalls-Match</h4></div>
       </div>
       <p class="hint" style="margin:0 0 14px;">Drückt gleichzeitig den Button – wer zuerst dran ist, wird sofort mit jemand anderem gepaired.</p>
       <div id="randomMatchArea" style="min-height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;">
-        <button class="primary-btn" id="randomMatchBtn">🔀 Los geht's</button>
+        <button class="primary-btn" id="randomMatchBtn">${ci('shuffle')} Los geht's</button>
       </div>
     </div>
   `;
@@ -3329,6 +3345,12 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.5.4 (2026-09-22):
+  - Eigene Icons auch in den Extras (Musik, Shoutouts, Zufalls-Match,
+    Screen-Message, Event Challenge, Gästeliste), im DJ-Banner und auf
+    den Buttons der Leer-Zustände -- statt Emojis, die auf jedem Handy
+    anders aussehen.
 
   Version 1.5.3 (2026-09-22):
   - Zähler auf dem Crushes-Icon: neue Crushes + ungelesene Nachrichten,
