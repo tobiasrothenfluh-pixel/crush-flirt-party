@@ -2334,6 +2334,7 @@ function renderProfileView() {
   const interestChips = (g.interests||[]).map(i => '<span class="tag">' + esc(labelFor(INTEREST_EMOJI, i)) + '</span>').join('');
   const musicChips = (g.music_preferences||[]).map(i => '<span class="tag">' + esc(labelFor(MUSIC_EMOJI, i)) + '</span>').join('');
   const drinkChips = (g.favorite_drinks||[]).map(i => '<span class="tag">' + esc(labelFor(DRINK_EMOJI, i)) + '</span>').join('');
+  const activityChips = (g.interested_in_activities||[]).map(i => '<span class="tag activity">' + esc(labelFor(ACTIVITY_EMOJI, i)) + '</span>').join('');
   el.innerHTML = `
     <div style="text-align:center; margin-bottom:18px;">
       <div class="avatar" style="width:72px;height:72px;font-size:24px;margin:0 auto 10px;overflow:hidden;">${avatarInner(g.photo_url, esc(initials(g.name)))}</div>
@@ -2343,6 +2344,7 @@ function renderProfileView() {
       <div class="profile-row"><div class="row-label"><span class="row-icon">🧑</span>Geschlecht</div><div class="row-value">${esc(GENDER_LABEL[g.gender] || g.gender || '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">💘</span>Interessiert an</div><div class="row-value">${esc(INTERESTED_IN_SHORT_LABEL[g.interested_in] || g.interested_in || '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">📍</span>Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
+      <div class="profile-row"><div class="row-label"><span class="row-icon">💭</span>Heute Lust auf…</div><div class="row-value chips">${activityChips || '<span class="row-value muted">–</span>'}</div></div>
     </div>
     <div class="profile-card">
       <div class="profile-row"><div class="row-label"><span class="row-icon">✨</span>Interessen</div><div class="row-value chips">${interestChips || '<span class="row-value muted">–</span>'}</div></div>
