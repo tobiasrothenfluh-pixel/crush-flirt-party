@@ -107,6 +107,19 @@
   }
   .login-logo svg { width: 100%; max-width: 270px; height: auto; filter: drop-shadow(0 0 22px rgba(247,42,133,0.35)); }
   .brand-logo { padding-top: 26px; padding-bottom: 8px; line-height: 0; }
+  /* Logo-Animation: Einblenden, pochendes Herz, Tagline schwingt ein, sanftes Leuchten */
+  .login-logo svg { animation: logoIn .7s cubic-bezier(.2,.9,.3,1.2) both, logoGlow 3.2s ease-in-out 1s infinite; }
+  .login-logo svg path { transform-box: fill-box; }
+  .login-logo svg path:nth-of-type(2) { transform-origin: 50% 60%; animation: heartBeat 1.6s ease-in-out .8s infinite; }
+  .login-logo svg path:nth-of-type(3) { transform-origin: 0% 50%; animation: tagIn .8s cubic-bezier(.2,.9,.3,1) .35s both; }
+  @keyframes logoIn { from { opacity: 0; transform: translateY(-12px) scale(.92); } to { opacity: 1; transform: none; } }
+  @keyframes tagIn { from { opacity: 0; transform: translateX(-6%) scaleX(.9); } to { opacity: 1; transform: none; } }
+  @keyframes heartBeat { 0%, 40%, 100% { transform: scale(1); } 10% { transform: scale(1.22); } 20% { transform: scale(1.02); } 30% { transform: scale(1.16); } }
+  @keyframes logoGlow {
+    0%, 100% { filter: drop-shadow(0 0 16px rgba(247,42,133,0.30)); }
+    50% { filter: drop-shadow(0 0 30px rgba(247,42,133,0.60)) drop-shadow(0 0 12px rgba(139,92,246,0.35)); }
+  }
+  @media (prefers-reduced-motion: reduce) { .login-logo svg, .login-logo svg path { animation: none !important; } }
   .brand-logo svg { height: 30px; width: auto; }
   /* Leuchtende, umlaufende Kontur: ein Lichtstreifen wandert um die Karte. */
   @property --evA { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
@@ -193,6 +206,20 @@
   }
   .primary-btn:disabled { opacity: 0.5; box-shadow: none; }
   .primary-btn:active:not(:disabled) { transform: scale(0.96); }
+  /* Einchecken: gleiche umlaufende Lichtkontur wie die Event-Karte */
+  #loginBtn {
+    border: 2px solid transparent;
+    background:
+      linear-gradient(90deg, #f72a85, #8b5cf6) padding-box,
+      conic-gradient(from var(--evA), #fff, #ffb3d4 12%, #f72a85 30%, #8b5cf6 55%, #d63ab8 80%, #fff) border-box;
+    animation: evSpin 3s linear infinite, btnGlow 2.6s ease-in-out infinite;
+  }
+  #loginBtn:disabled { animation: none; }
+  @keyframes btnGlow {
+    0%, 100% { box-shadow: 0 6px 18px rgba(247,42,133,0.30), 0 0 0 rgba(139,92,246,0); }
+    50% { box-shadow: 0 6px 26px rgba(247,42,133,0.55), 0 0 28px rgba(139,92,246,0.35); }
+  }
+  @media (prefers-reduced-motion: reduce) { #loginBtn { animation: none; } }
   .err-msg { color: #ff6b6b; font-size: 14px; line-height: 1.5; margin-top: 12px; text-align: center; }
   .hint { color: #9b8fae; font-size: 13px; line-height: 1.6; }
   .toggle-new { text-align: center; margin-top: 16px; font-size: 13px; font-weight: 700; line-height: 1.6; color: #c9a7ff; cursor: pointer; }
