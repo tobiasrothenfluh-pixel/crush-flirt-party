@@ -783,6 +783,73 @@
     font-weight: 700; cursor: pointer;
   }
   .confirm-card .confirm-ok.danger { background: linear-gradient(90deg, #ff3d3d, #ff6b6b); box-shadow: 0 6px 16px rgba(255,61,61,0.3); }
+
+  /* ===== Modern-Look (Glas, Glow, Verlauf) – bewusst als Schicht obendrauf ===== */
+  #mainScreen {
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(247,42,133,0.16), transparent 55%),
+      radial-gradient(120% 60% at 100% 25%, rgba(139,92,246,0.14), transparent 55%),
+      radial-gradient(100% 50% at 50% 100%, rgba(214,58,184,0.10), transparent 60%);
+  }
+  .swipe-card, .profile-card, .extras-card {
+    background: linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018)) , rgba(20,14,30,0.72);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 14px 34px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.06);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  .profile-card { border-radius: 20px; }
+  .extras-card { border-radius: 22px; }
+  .swipe-card { border-radius: 26px; box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 0 34px rgba(247,42,133,0.16), inset 0 1px 0 rgba(255,255,255,0.07); }
+  .swipe-photo { height: 210px; position: relative; overflow: hidden;
+    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.22), transparent 45%), linear-gradient(135deg, #f72a85, #d63ab8 50%, #8b5cf6); }
+  .swipe-photo::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.18) 45%, transparent 60%);
+    transform: translateX(-100%); animation: cardShine 4.5s ease-in-out 1s infinite; }
+  @keyframes cardShine { 0%, 60% { transform: translateX(-100%); } 85%, 100% { transform: translateX(100%); } }
+  .swipe-body h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  .tag { background: rgba(139,92,246,0.14); border: 1px solid rgba(139,92,246,0.22); color: #d9c7ff; border-radius: 999px; }
+  .tag.activity { border-color: transparent; box-shadow: 0 2px 10px rgba(247,42,133,0.25); }
+  .btn-no { background: rgba(255,255,255,0.04) !important; }
+  #swipeCrush {
+    border: 2px solid transparent !important;
+    background: linear-gradient(90deg, #f72a85, #8b5cf6) padding-box, conic-gradient(from var(--evA), #fff, #ffb3d4 12%, #f72a85 30%, #8b5cf6 55%, #d63ab8 80%, #fff) border-box;
+    animation: evSpin 3s linear infinite, btnGlow 2.6s ease-in-out infinite;
+  }
+  .live-guest-counter { box-shadow: 0 0 16px rgba(74,222,128,0.15); }
+  /* Crushes als Karten */
+  .match-item { background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)), rgba(20,14,30,0.6);
+    border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; margin-bottom: 10px; padding: 0 8px; }
+  .match-item:has(.unread-dot) { border-color: rgba(247,42,133,0.45); box-shadow: 0 0 18px rgba(247,42,133,0.18); }
+  .match-row { border-bottom: none; border-radius: 16px; }
+  .match-row:active { background: rgba(255,255,255,0.04); }
+  .avatar { box-shadow: 0 0 0 2px rgba(255,255,255,0.08), 0 6px 16px rgba(247,42,133,0.25); }
+  /* Chat */
+  .bubble { border-radius: 18px; padding: 10px 14px; font-size: 14px; }
+  .bubble-row.me .bubble { box-shadow: 0 6px 16px rgba(247,42,133,0.25); }
+  .bubble-row.them .bubble { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.07); }
+  .chat-input-row { background: rgba(14,10,22,0.8); border-top-color: rgba(255,255,255,0.06); }
+  /* Extras-Kacheln */
+  .extras-nav-item { background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015)), rgba(20,14,30,0.6);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; }
+  .extras-nav-item .nav-icon { font-size: 22px; }
+  .extras-nav-item.selected { box-shadow: 0 8px 24px rgba(247,42,133,0.35); }
+  .secondary-btn { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); }
+  input[type=text], input[type=number], select { background: rgba(255,255,255,0.05) !important; border-color: rgba(255,255,255,0.1) !important; }
+  /* Tabbar: Glas mit leuchtendem Aktiv-Zustand */
+  .tabbar { background: rgba(14,10,22,0.82); border-top: 1px solid rgba(255,255,255,0.06);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); padding: 6px 8px 0; gap: 4px; }
+  .tabbar button { border-radius: 16px; padding: 8px 4px 12px; margin-bottom: 4px; transition: background .2s ease, color .2s ease; }
+  .tabbar button .icon { transition: transform .2s ease; }
+  .tabbar button.active { background: linear-gradient(180deg, rgba(247,42,133,0.16), rgba(139,92,246,0.10)); color: #ff7ab0; }
+  .tabbar button.active .icon { transform: translateY(-1px) scale(1.12); filter: drop-shadow(0 0 8px rgba(247,42,133,0.7)); }
+  @media (prefers-reduced-motion: reduce) { .swipe-photo::after, #swipeCrush { animation: none; } }
+  /* Wischen: Karte folgt dem Finger, Stempel zeigen die Richtung */
+  #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none; }
+  .swipe-stamp { position: absolute; top: 22px; padding: 6px 14px; border-radius: 12px; font-size: 22px; font-weight: 900; letter-spacing: .06em;
+    opacity: 0; pointer-events: none; z-index: 3; border: 3px solid currentColor; background: rgba(10,7,16,0.35); }
+  .swipe-stamp.like { left: 18px; color: #fff; border-color: #fff; background: rgba(247,42,133,0.55); transform: rotate(-14deg); text-shadow: 0 0 12px rgba(247,42,133,0.8); box-shadow: 0 0 18px rgba(247,42,133,0.5); }
+  .swipe-stamp.nope { right: 18px; color: #ff6b6b; transform: rotate(14deg); }
+  .swipe-hint { text-align: center; font-size: 12px; color: #8f80a8; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -1724,6 +1791,7 @@ async function loadNextCandidate() {
         <button class="btn-no" id="swipeNo">✕ No</button>
         <button class="btn-crush" id="swipeCrush">💗 Crush</button>
       </div>
+      <div class="swipe-hint">👉 Karte nach rechts wischen = Crush · nach links = No</div>
       <label for="icebreakerInput" style="margin-top:14px;">Flirt-Spruch mitschicken <span class="label-optional">Optional</span></label>
       <input id="icebreakerInput" type="text" placeholder="Nur sichtbar bei einem Match…">
       <div style="text-align:left; margin-top:4px;">
@@ -1734,6 +1802,7 @@ async function loadNextCandidate() {
     `;
     wireChipRow('inviteChips', (val) => { selectedInvite = val; }, false);
     document.getElementById('swipeNo').addEventListener('click', () => { feedbackTap(); doSwipe('pass'); });
+    try { enableCardDrag(); } catch (e) { console.error(e); }
     document.getElementById('swipeCrush').addEventListener('click', () => { feedbackTap(); doSwipe('crush'); });
     document.getElementById('randomIcebreakerBtn').addEventListener('click', () => {
       const pick = ICEBREAKER_SUGGESTIONS[Math.floor(Math.random() * ICEBREAKER_SUGGESTIONS.length)];
@@ -1742,6 +1811,54 @@ async function loadNextCandidate() {
   } catch (e) {
     renderFriendlyError(area, e, loadNextCandidate, 'retrySwipe');
   }
+}
+
+// Wisch-Geste auf der Karte (wie Tinder): rechts = Crush, links = No.
+function enableCardDrag() {
+  const card = document.querySelector('#swipeArea .swipe-card');
+  if (!card || !window.PointerEvent) return;
+  card.style.touchAction = 'pan-y';
+  card.insertAdjacentHTML('beforeend', '<div class="swipe-stamp like">CRUSH 💗</div><div class="swipe-stamp nope">NOPE ✕</div>');
+  const like = card.querySelector('.swipe-stamp.like'), nope = card.querySelector('.swipe-stamp.nope');
+  let sx = 0, sy = 0, dx = 0, dragging = false, pid = null, done = false;
+  const clamp = v => Math.max(0, Math.min(1, v));
+  card.addEventListener('pointerdown', e => {
+    if (done || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    sx = e.clientX; sy = e.clientY; dx = 0; dragging = false; pid = e.pointerId;
+  });
+  card.addEventListener('pointermove', e => {
+    if (done || pid !== e.pointerId) return;
+    const mx = e.clientX - sx, my = e.clientY - sy;
+    if (!dragging) {
+      if (Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my) * 1.2) {
+        dragging = true; card.style.transition = 'none';
+        try { card.setPointerCapture(pid); } catch (err) {}
+      } else return;
+    }
+    dx = mx;
+    card.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 18) + 'deg)';
+    like.style.opacity = clamp(dx / 100); nope.style.opacity = clamp(-dx / 100);
+  });
+  const end = () => {
+    if (!dragging) { pid = null; return; }
+    dragging = false; pid = null;
+    const threshold = Math.min(110, card.offsetWidth * 0.28);
+    if (Math.abs(dx) > threshold) {
+      done = true;
+      const dir = dx > 0 ? 1 : -1;
+      card.style.transition = 'transform .3s ease-out, opacity .3s ease-out';
+      card.style.transform = 'translateX(' + (dir * window.innerWidth * 1.2) + 'px) rotate(' + (dir * 24) + 'deg)';
+      card.style.opacity = '0';
+      feedbackTap();
+      setTimeout(() => doSwipe(dir > 0 ? 'crush' : 'pass'), 230);
+    } else {
+      card.style.transition = 'transform .28s cubic-bezier(.2,.9,.3,1.2)';
+      card.style.transform = '';
+      like.style.opacity = 0; nope.style.opacity = 0;
+    }
+  };
+  card.addEventListener('pointerup', end);
+  card.addEventListener('pointercancel', end);
 }
 
 async function doSwipe(response) {
