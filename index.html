@@ -358,6 +358,21 @@
   .se-actions { display: flex; gap: 10px; max-width: 300px; margin: 10px auto 0; }
   .se-actions .secondary-btn { flex: 1; margin-top: 0; }
   @media (prefers-reduced-motion: reduce) { .se-ring, .se-core, .se-sweep, .se-live .dot { animation: none; } .se-ring { opacity: .4; } }
+  /* Crushes: noch leer – zwei Avatare mit pochendem Herz dazwischen */
+  .crush-empty { text-align: center; padding: 26px 20px 8px; }
+  .ce-pair { position: relative; display: flex; align-items: center; justify-content: center; gap: 14px; margin: 8px auto 26px; height: 120px; }
+  .ce-av { width: 78px; height: 78px; border-radius: 50%; display: grid; place-items: center; font-size: 36px;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), rgba(139,92,246,0.35) 55%, rgba(22,16,40,0.9));
+    border: 2px solid rgba(255,255,255,0.12); box-shadow: 0 0 24px rgba(139,92,246,0.35); }
+  .ce-me { animation: ceLeft 2.4s ease-in-out infinite; }
+  .ce-you { animation: ceRight 2.4s ease-in-out infinite; border-style: dashed; border-color: rgba(247,42,133,0.6); box-shadow: 0 0 24px rgba(247,42,133,0.35); }
+  .ce-heart { font-size: 34px; filter: drop-shadow(0 0 12px rgba(247,42,133,0.9)); animation: seCore 1.6s ease-in-out infinite; }
+  .ce-float { position: absolute; bottom: 10px; font-size: 18px; opacity: 0; animation: ceFloat 3.6s ease-out infinite; }
+  .ce-float.f1 { left: 42%; animation-delay: 0s; } .ce-float.f2 { left: 55%; animation-delay: 1.2s; } .ce-float.f3 { left: 49%; animation-delay: 2.4s; }
+  @keyframes ceLeft { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
+  @keyframes ceRight { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-6px); } }
+  @keyframes ceFloat { 0% { transform: translateY(0) scale(.7); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-110px) scale(1.1); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .ce-me, .ce-you, .ce-heart, .ce-float { animation: none; } }
   .empty-state { text-align: center; color: #9b8fae; font-size: 15px; line-height: 1.7; margin-top: 64px; padding: 0 28px; }
   @keyframes matchPop {
     0% { opacity: 0; transform: scale(0.82) translateY(14px); }
@@ -2314,7 +2329,25 @@ async function loadMatches() {
   try {
     const rows = await callRpc('get_my_matches', {});
     if (!rows.length) {
-      el.innerHTML = '<div class="empty-state">Noch keine Crushes. Ab zum Swipen! 💗</div>';
+      el.innerHTML = `
+        <div class="crush-empty">
+          <div class="ce-pair">
+            <div class="ce-av ce-me">😊</div>
+            <div class="ce-heart">💗</div>
+            <div class="ce-av ce-you">❔</div>
+            <span class="ce-float f1">💕</span><span class="ce-float f2">✨</span><span class="ce-float f3">💖</span>
+          </div>
+          <h3 class="se-title"><span>Dein erster Crush wartet</span> 💘</h3>
+          <p class="se-sub">Sobald ihr euch gegenseitig crusht, erscheint ihr hier – und könnt direkt chatten.</p>
+          <button class="primary-btn se-btn" id="ceSwipe">💗 Jetzt swipen</button>
+          <div class="se-actions">
+            <button class="secondary-btn" id="ceRandom">🔀 Zufalls-Match</button>
+            <button class="secondary-btn" id="ceSong">🎵 Songwunsch</button>
+          </div>
+        </div>`;
+      document.getElementById('ceSwipe').addEventListener('click', () => showTab('swipe'));
+      document.getElementById('ceRandom').addEventListener('click', () => { extrasSubtab = 'game'; showTab('extras'); });
+      document.getElementById('ceSong').addEventListener('click', () => { extrasSubtab = 'song'; showTab('extras'); });
       return;
     }
     el.innerHTML = rows.map(r => {
