@@ -844,7 +844,7 @@
   .tabbar button.active .icon { transform: translateY(-1px) scale(1.12); filter: drop-shadow(0 0 8px rgba(247,42,133,0.7)); }
   @media (prefers-reduced-motion: reduce) { .swipe-photo::after, #swipeCrush { animation: none; } }
   /* Wischen: Karte folgt dem Finger, Stempel zeigen die Richtung */
-  #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none;
+  #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y;
     /* kein Glas-Blur auf der bewegten Karte – das ruckelt auf dem iPhone */
     -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(160deg, #221a30, #17111f); transform: translate3d(0,0,0); }
   #swipeArea .swipe-card.dragging { box-shadow: 0 10px 24px rgba(0,0,0,0.4); }
@@ -1507,6 +1507,7 @@ function returnToLogin(message) {
   confirmOpen = false;
   currentProfile = null;
   currentCandidate = null;
+  try { resetCandidateQueue(); } catch (e) {}
   document.getElementById('mainScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginQr').value = '';
@@ -1588,6 +1589,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     });
     const isNew = rows[0] && rows[0].is_new;
     myEventId = (rows[0] && rows[0].event_id) || eventId;
+    try { resetCandidateQueue(); } catch (e) {}
     await seedSeenMatches();
     await seedSeenSongStatus();
     document.getElementById('loginScreen').classList.add('hidden');
@@ -1768,19 +1770,36 @@ function renderSwipeEmpty(area) {
   }, 25000);
 }
 
+// Vorgeladene Kandidaten: die nächste Karte ist sofort da, ohne Warten aufs Netz.
+let candQueue = [], swipedIds = new Set(), fetchingCands = null;
+function resetCandidateQueue() { candQueue = []; swipedIds = new Set(); }
+function fetchCandidates() {
+  if (fetchingCands) return fetchingCands;
+  fetchingCands = (async () => {
+    const rows = await callRpc('get_swipe_candidates', { p_limit: 6 });
+    for (const r of (rows || [])) {
+      if (!swipedIds.has(r.id) && !candQueue.some(c => c.id === r.id)) candQueue.push(r);
+    }
+  })().finally(() => { fetchingCands = null; });
+  return fetchingCands;
+}
+
 async function loadNextCandidate() {
   if (swipeEmptyTimer) { clearTimeout(swipeEmptyTimer); swipeEmptyTimer = null; }
   const area = document.getElementById('swipeArea');
-  area.innerHTML = '<div class="loading">Suche…</div>';
   selectedInvite = null;
   try {
-    const rows = await callRpc('get_swipe_candidates', { p_limit: 1 });
-    if (!rows.length) {
+    if (!candQueue.length) {
+      area.innerHTML = '<div class="loading">Suche…</div>';
+      await fetchCandidates();
+    }
+    if (!candQueue.length) {
       currentCandidate = null;
       renderSwipeEmpty(area);
       return;
     }
-    currentCandidate = rows[0];
+    currentCandidate = candQueue[0];
+    if (candQueue.length < 3) fetchCandidates().catch(() => {});
     const g = currentCandidate;
     area.innerHTML = `
       <div class="swipe-card">
@@ -1819,79 +1838,99 @@ async function loadNextCandidate() {
 }
 
 // Wisch-Geste auf der Karte (wie Tinder): rechts = Crush, links = No.
+// Auf dem Handy mit Touch-Events (zuverlässiger als Pointer-Events auf iOS),
+// am Computer mit der Maus. Ein kurzer, schneller Wisch reicht.
 function enableCardDrag() {
   const card = document.querySelector('#swipeArea .swipe-card');
-  if (!card || !window.PointerEvent) return;
-  card.style.touchAction = 'pan-y';
+  if (!card) return;
   card.insertAdjacentHTML('beforeend', '<div class="swipe-stamp like">CRUSH 💗</div><div class="swipe-stamp nope">NOPE ✕</div>');
   const like = card.querySelector('.swipe-stamp.like'), nope = card.querySelector('.swipe-stamp.nope');
-  let sx = 0, sy = 0, dx = 0, dragging = false, pid = null, done = false, raf = 0;
+  let sx = 0, sy = 0, dx = 0, mode = null, done = false, raf = 0, pts = [];
   const clamp = v => Math.max(0, Math.min(1, v));
-  card.addEventListener('pointerdown', e => {
-    if (done || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    sx = e.clientX; sy = e.clientY; dx = 0; dragging = false; pid = e.pointerId;
-  });
-  card.addEventListener('pointermove', e => {
-    if (done || pid !== e.pointerId) return;
-    const mx = e.clientX - sx, my = e.clientY - sy;
-    if (!dragging) {
-      if (Math.abs(mx) > 10 && Math.abs(mx) > Math.abs(my) * 1.2) {
-        dragging = true; card.style.transition = 'none'; card.classList.add('dragging');
-        try { card.setPointerCapture(pid); } catch (err) {}
-      } else return;
+  const paint = () => {
+    raf = 0;
+    card.style.transform = 'translate3d(' + dx + 'px,0,0) rotate(' + (dx / 20) + 'deg)';
+    like.style.opacity = clamp(dx / 80); nope.style.opacity = clamp(-dx / 80);
+  };
+  const start = (x, y) => {
+    if (done) return;
+    sx = x; sy = y; dx = 0; mode = null; pts = [[x, performance.now()]];
+  };
+  // Liefert true, solange wir horizontal ziehen (dann Scrollen verhindern).
+  const move = (x, y) => {
+    if (done || mode === 'scroll') return false;
+    const mx = x - sx, my = y - sy;
+    if (!mode) {
+      if (Math.abs(mx) < 6 && Math.abs(my) < 6) return false;
+      mode = Math.abs(mx) >= Math.abs(my) ? 'drag' : 'scroll';
+      if (mode === 'scroll') return false;
+      card.style.transition = 'none'; card.style.animation = 'none'; card.classList.add('dragging');
     }
+    const now = performance.now();
+    pts.push([x, now]);
+    while (pts.length > 2 && now - pts[0][1] > 120) pts.shift();
     dx = mx;
-    if (!raf) raf = requestAnimationFrame(() => {
-      raf = 0;
-      card.style.transform = 'translate3d(' + dx + 'px,0,0) rotate(' + (dx / 18) + 'deg)';
-      like.style.opacity = clamp(dx / 100); nope.style.opacity = clamp(-dx / 100);
-    });
-    if (e.cancelable) e.preventDefault();
-  });
+    if (!raf) raf = requestAnimationFrame(paint);
+    return true;
+  };
   const end = () => {
-    if (!dragging) { pid = null; return; }
-    dragging = false; pid = null;
+    if (mode !== 'drag') { mode = null; return; }
+    mode = null;
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     card.classList.remove('dragging');
-    const threshold = Math.min(110, card.offsetWidth * 0.28);
-    if (Math.abs(dx) > threshold) {
+    const w = card.offsetWidth || 320;
+    const a = pts[0], b = pts[pts.length - 1];
+    const vel = (b && a && b[1] > a[1]) ? (b[0] - a[0]) / (b[1] - a[1]) : 0;   // px pro ms
+    const flick = Math.abs(vel) > 0.3 && Math.abs(dx) > 25 && Math.sign(vel) === Math.sign(dx);
+    if (Math.abs(dx) > w * 0.18 || flick) {
       done = true;
       const dir = dx > 0 ? 1 : -1;
-      card.style.transition = 'transform .3s ease-out, opacity .3s ease-out';
-      card.style.transform = 'translate3d(' + (dir * window.innerWidth * 1.2) + 'px,0,0) rotate(' + (dir * 24) + 'deg)';
+      card.style.transition = 'transform .22s ease-out, opacity .22s ease-out';
+      card.style.transform = 'translate3d(' + (dir * w * 1.5) + 'px,0,0) rotate(' + (dir * 22) + 'deg)';
       card.style.opacity = '0';
+      if (dir > 0) like.style.opacity = 1; else nope.style.opacity = 1;
       feedbackTap();
-      setTimeout(() => doSwipe(dir > 0 ? 'crush' : 'pass'), 230);
+      setTimeout(() => doSwipe(dir > 0 ? 'crush' : 'pass'), 160);
     } else {
-      card.style.transition = 'transform .28s cubic-bezier(.2,.9,.3,1.2)';
+      card.style.transition = 'transform .25s cubic-bezier(.2,.9,.3,1.2)';
       card.style.transform = 'translate3d(0,0,0)';
       like.style.opacity = 0; nope.style.opacity = 0;
     }
   };
-  card.addEventListener('pointerup', end);
-  card.addEventListener('pointercancel', end);
+  card.addEventListener('touchstart', e => { if (e.touches.length === 1) start(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+  card.addEventListener('touchmove', e => { if (e.touches.length === 1 && move(e.touches[0].clientX, e.touches[0].clientY) && e.cancelable) e.preventDefault(); }, { passive: false });
+  card.addEventListener('touchend', end);
+  card.addEventListener('touchcancel', end);
+  // Maus (Computer)
+  card.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    start(e.clientX, e.clientY);
+    const mm = ev => { if (move(ev.clientX, ev.clientY)) ev.preventDefault(); };
+    const mu = () => { document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); end(); };
+    document.addEventListener('mousemove', mm);
+    document.addEventListener('mouseup', mu);
+  });
 }
 
 async function doSwipe(response) {
-  if (!currentCandidate || !currentCandidate.id) { loadNextCandidate(); return; }
+  const g = currentCandidate;
+  if (!g || !g.id) { loadNextCandidate(); return; }
   const area = document.getElementById('swipeArea');
-  const name = currentCandidate.name;
-  const noBtn = document.getElementById('swipeNo');
-  const crushBtn = document.getElementById('swipeCrush');
-  if (noBtn) noBtn.disabled = true;
-  if (crushBtn) crushBtn.disabled = true;
+  const name = g.name;
   const icebreakerEl = document.getElementById('icebreakerInput');
   const icebreaker = icebreakerEl ? icebreakerEl.value.trim() : '';
   const inviteLine = selectedInvite ? labelFor(ACTIVITY_EMOJI, selectedInvite) + '? 😉' : '';
   const combinedMsg = [inviteLine, icebreaker].filter(Boolean).join('\n');
   const icebreakerArg = (response === 'crush' && combinedMsg) ? combinedMsg : null;
+  // Sofort weiter zur nächsten Karte – gespeichert wird im Hintergrund.
+  candQueue = candQueue.filter(c => c.id !== g.id);
+  swipedIds.add(g.id);
+  currentCandidate = null;
+  loadNextCandidate();
   try {
     // crush_swipe RETURNS a single `matches` row (not a SETOF/TABLE) — PostgREST
-    // hands back one plain object, not an array. Indexing with [0] here used to
-    // silently produce undefined on every single swipe, so the in-flow "It's a
-    // Crush!" celebration screen never actually fired (matches still surfaced
-    // later via the toast poller/Crushes tab, which is why this went unnoticed).
-    const m = await callRpc('crush_swipe', { p_target_guest_id: currentCandidate.id, p_response: response, p_icebreaker: icebreakerArg });
+    // hands back one plain object, not an array.
+    const m = await callRpc('crush_swipe', { p_target_guest_id: g.id, p_response: response, p_icebreaker: icebreakerArg });
     if (m && m.mutual) {
       feedbackMatch();
       const seen = getSeenMatches();
@@ -1899,14 +1938,12 @@ async function doSwipe(response) {
       saveSeenMatches(seen);
       const sentNote = combinedMsg ? '<div class="match-sent-note">Deine Nachricht wurde direkt als erste Nachricht verschickt 💬</div>' : '';
       // The other side may already have a pending icebreaker/invite waiting from
-      // before (blind crush) — show it here so it isn't buried, invisible until
-      // the person opens the chat. Figure out which column belongs to them by
-      // comparing guest ids, not by assuming we're always guest_a or guest_b.
-      const partnerIcebreaker = (m.guest_a_id === currentCandidate.id) ? m.icebreaker_from_a : m.icebreaker_from_b;
+      // before (blind crush) — show it here so it isn't buried.
+      const partnerIcebreaker = (m.guest_a_id === g.id) ? m.icebreaker_from_a : m.icebreaker_from_b;
       const partnerNote = partnerIcebreaker
         ? '<div class="match-partner-invite"><div class="match-partner-invite-label">💌 ' + esc(name) + ' hat dir das geschickt</div><div class="match-partner-invite-text">' + esc(partnerIcebreaker).replace(/\n/g, '<br>') + '</div></div>'
         : '';
-      const partnerAvatar = avatarInner(currentCandidate.photo_url, esc(initials(name)));
+      const partnerAvatar = avatarInner(g.photo_url, esc(initials(name)));
       area.innerHTML =
         '<div class="match-result">' +
           '<div class="match-photo-circle">' + partnerAvatar + '</div>' +
@@ -1921,13 +1958,17 @@ async function doSwipe(response) {
         '</div>';
       document.getElementById('matchContinue').addEventListener('click', loadNextCandidate);
       document.getElementById('matchGoChat').addEventListener('click', () => {
-        openChat(m.id, name, currentCandidate.qr_code, currentCandidate.id);
+        openChat(m.id, name, g.qr_code, g.id);
       });
-    } else {
-      loadNextCandidate();
     }
   } catch (e) {
-    renderFriendlyError(area, e, loadNextCandidate, 'retrySwipe');
+    console.error(e);
+    if (((e && e.message) || '').includes('not_checked_in')) { returnToLogin('Du bist nicht mehr eingecheckt – gib deinen Crush Name nochmal ein.'); return; }
+    // Nicht gespeichert: Karte wieder nach vorne holen, damit nichts verloren geht.
+    swipedIds.delete(g.id);
+    if (!candQueue.some(c => c.id === g.id)) candQueue.unshift(g);
+    showToast('😅 ' + name + ' nicht gespeichert – bitte nochmal wischen.');
+    loadNextCandidate();
   }
 }
 
