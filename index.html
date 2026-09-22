@@ -336,6 +336,28 @@
   .swipe-actions button:active:not(:disabled) { transform: scale(0.95); }
   .btn-no { background: #1c1626; color: #ff6b6b; border: 1.5px solid #4a2f38 !important; }
   .btn-crush { background: linear-gradient(90deg, #f72a85, #8b5cf6); color: #fff; box-shadow: 0 6px 20px rgba(247,42,133,0.3); }
+  /* Swipe: alle durch – leuchtendes Radar statt leerer Text */
+  .swipe-empty { text-align: center; padding: 18px 20px 8px; }
+  .se-radar { position: relative; width: 150px; height: 150px; margin: 10px auto 22px; display: grid; place-items: center; }
+  .se-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(247,42,133,0.55); box-shadow: 0 0 18px rgba(247,42,133,0.35), inset 0 0 18px rgba(139,92,246,0.25); animation: seRing 2.8s ease-out infinite; opacity: 0; }
+  .se-ring.d2 { animation-delay: .93s; border-color: rgba(139,92,246,0.55); }
+  .se-ring.d3 { animation-delay: 1.86s; border-color: rgba(214,58,184,0.55); }
+  .se-core { width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; font-size: 44px;
+    background: radial-gradient(circle at 35% 30%, rgba(247,42,133,0.55), rgba(139,92,246,0.35) 60%, rgba(22,16,40,0.9));
+    box-shadow: 0 0 30px rgba(247,42,133,0.55), 0 0 60px rgba(139,92,246,0.35); animation: seCore 1.6s ease-in-out infinite; }
+  .se-sweep { position: absolute; inset: 8px; border-radius: 50%; background: conic-gradient(from 0deg, rgba(247,42,133,0.35), transparent 25%); animation: seSweep 2.4s linear infinite; }
+  @keyframes seRing { 0% { transform: scale(.55); opacity: .9; } 100% { transform: scale(1.35); opacity: 0; } }
+  @keyframes seCore { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.12); } 30% { transform: scale(1); } 45% { transform: scale(1.08); } }
+  @keyframes seSweep { to { transform: rotate(360deg); } }
+  .se-title { margin: 0 0 8px; font-size: 22px; font-weight: 800; }
+  .se-title span { background: linear-gradient(90deg, #ff7ab0, #f72a85, #b69cff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .se-sub { margin: 0 auto 14px; max-width: 300px; color: #c9bfd9; font-size: 14.5px; line-height: 1.55; }
+  .se-live { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #9b8fae; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); padding: 6px 12px; border-radius: 999px; }
+  .se-live .dot { width: 7px; height: 7px; border-radius: 50%; background: #f72a85; box-shadow: 0 0 8px #f72a85; animation: liveBlink 1.4s ease-in-out infinite; }
+  .se-btn { max-width: 300px; margin: 18px auto 0; display: block; }
+  .se-actions { display: flex; gap: 10px; max-width: 300px; margin: 10px auto 0; }
+  .se-actions .secondary-btn { flex: 1; margin-top: 0; }
+  @media (prefers-reduced-motion: reduce) { .se-ring, .se-core, .se-sweep, .se-live .dot { animation: none; } .se-ring { opacity: .4; } }
   .empty-state { text-align: center; color: #9b8fae; font-size: 15px; line-height: 1.7; margin-top: 64px; padding: 0 28px; }
   @keyframes matchPop {
     0% { opacity: 0; transform: scale(0.82) translateY(14px); }
@@ -1632,7 +1654,49 @@ function wireChipRow(containerId, activeSetOrOnChange, multi = true) {
   }
 }
 
+const SWIPE_EMPTY_LINES = [
+  'Neue Gäste checken laufend ein – schau gleich nochmal vorbei!',
+  'Zeit für die Tanzfläche 💃 – neue Crushes kommen bestimmt.',
+  'Hol dir was an der Bar 🍹 – sobald jemand Neues da ist, taucht er hier auf.',
+  'Vielleicht wartet schon jemand in deinen Crushes 👀',
+  'Wünsch dir einen Song 🎵 – und dann weiterswipen!'
+];
+let swipeEmptyTimer = null;
+function renderSwipeEmpty(area) {
+  const line = SWIPE_EMPTY_LINES[Math.floor(Math.random() * SWIPE_EMPTY_LINES.length)];
+  area.innerHTML = `
+    <div class="swipe-empty">
+      <div class="se-radar"><span class="se-sweep"></span><span class="se-ring"></span><span class="se-ring d2"></span><span class="se-ring d3"></span><div class="se-core">💘</div></div>
+      <h3 class="se-title"><span>Alle durchgeswiped!</span> 🔥</h3>
+      <p class="se-sub">${esc(line)}</p>
+      <div class="se-live"><span class="dot"></span>Wir halten Ausschau nach neuen Crushes…</div>
+      <button class="primary-btn se-btn" id="seReload">🔄 Nochmal schauen</button>
+      <div class="se-actions">
+        <button class="secondary-btn" id="seCrushes">💘 Meine Crushes</button>
+        <button class="secondary-btn" id="seSong">🎵 Songwunsch</button>
+      </div>
+    </div>`;
+  document.getElementById('seReload').addEventListener('click', loadNextCandidate);
+  document.getElementById('seCrushes').addEventListener('click', () => showTab('matches'));
+  document.getElementById('seSong').addEventListener('click', () => { extrasSubtab = 'song'; showTab('extras'); });
+  // Still und leise nachschauen, ob inzwischen jemand Neues eingecheckt hat.
+  if (swipeEmptyTimer) clearTimeout(swipeEmptyTimer);
+  swipeEmptyTimer = setTimeout(async function check() {
+    swipeEmptyTimer = null;
+    const tab = document.getElementById('tab-swipe');
+    if (!document.getElementById('seReload') || !tab || tab.classList.contains('hidden')) return;
+    if (!document.hidden) {
+      try {
+        const rows = await callRpc('get_swipe_candidates', { p_limit: 1 });
+        if (rows && rows.length && document.getElementById('seReload')) { loadNextCandidate(); return; }
+      } catch (e) {}
+    }
+    if (document.getElementById('seReload')) swipeEmptyTimer = setTimeout(check, 25000);
+  }, 25000);
+}
+
 async function loadNextCandidate() {
+  if (swipeEmptyTimer) { clearTimeout(swipeEmptyTimer); swipeEmptyTimer = null; }
   const area = document.getElementById('swipeArea');
   area.innerHTML = '<div class="loading">Suche…</div>';
   selectedInvite = null;
@@ -1640,7 +1704,7 @@ async function loadNextCandidate() {
     const rows = await callRpc('get_swipe_candidates', { p_limit: 1 });
     if (!rows.length) {
       currentCandidate = null;
-      area.innerHTML = '<div class="empty-state">Niemand mehr da 👀<br>Alle geswiped oder noch keine passenden Leute eingecheckt.</div>';
+      renderSwipeEmpty(area);
       return;
     }
     currentCandidate = rows[0];
