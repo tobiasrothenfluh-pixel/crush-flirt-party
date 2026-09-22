@@ -857,6 +857,13 @@
   .tabbar button .icon { transition: transform .2s ease; }
   .tabbar button.active { background: linear-gradient(180deg, rgba(247,42,133,0.16), rgba(139,92,246,0.10)); color: #ff7ab0; }
   .tabbar button.active .icon { transform: translateY(-1px) scale(1.12); filter: drop-shadow(0 0 8px rgba(247,42,133,0.7)); }
+  /* Eigene Tab-Icons (Vektor): grau, aktiv mit Verlauf + Leuchten */
+  .tabbar .ti { width: 26px; height: 26px; margin: 0 auto 3px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .tabbar .ti .fillme { fill: none; }
+  .tabbar button.active .ti { stroke: url(#tabGrad); filter: drop-shadow(0 0 6px rgba(247,42,133,0.75)); animation: tiPop .35s cubic-bezier(.2,.9,.3,1.4); }
+  .tabbar button.active .ti .fillme { fill: url(#tabGrad); }
+  @keyframes tiPop { 0% { transform: scale(.8); } 60% { transform: translateY(-1px) scale(1.2); } 100% { transform: translateY(-1px) scale(1.12); } }
+  @media (prefers-reduced-motion: reduce) { .tabbar button.active .ti { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .swipe-photo::after, #swipeCrush { animation: none; } }
   /* Wischen: Karte folgt dem Finger, Stempel zeigen die Richtung */
   #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y;
@@ -1068,7 +1075,7 @@ c-57 -19 -98 -136 -193 -552 -65 -288 -59 -331 51 -371 40 -15 80 0 94 34 6
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.5.1 · 2026</div>
+    <div class="version-footer">Version 1.5.2 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -1154,10 +1161,11 @@ M6067 6293 c-12 -11 -8 -1787 4 -1913 48 -530 259 -860 684 -1070 249 -123
     </div>
 
     <div class="tabbar" id="tabbar">
-      <button data-tab="swipe" class="active"><span class="icon">💜</span>Swipe</button>
-      <button data-tab="matches"><span class="icon">💘</span>Crushes</button>
-      <button data-tab="extras"><span class="icon">🎁</span>Extras</button>
-      <button data-tab="profile"><span class="icon">👤</span>Profil</button>
+      <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="tabGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f72a85"/><stop offset=".55" stop-color="#d63ab8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs></svg>
+      <button data-tab="swipe" class="active"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5.2" width="10.5" height="14.5" rx="2.4" transform="rotate(-14 8.4 12.4)" opacity=".55"/><rect x="9" y="4" width="11" height="15.5" rx="2.6"/><path d="M14.5 14.2c-1.9-1.3-3-2.3-3-3.5 0-.9.7-1.5 1.5-1.5.6 0 1.1.3 1.5.8.4-.5.9-.8 1.5-.8.8 0 1.5.6 1.5 1.5 0 1.2-1.1 2.2-3 3.5z" class="fillme"/></svg>Swipe</button>
+      <button data-tab="matches"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5l-3.6-2.6H6.5A3 3 0 0 1 3.5 15V7A3 3 0 0 1 6.5 4h11a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2z"/><path d="M12 14.6c-2.3-1.5-3.6-2.8-3.6-4.2 0-1.1.8-1.9 1.8-1.9.8 0 1.4.4 1.8 1 .4-.6 1-1 1.8-1 1 0 1.8.8 1.8 1.9 0 1.4-1.3 2.7-3.6 4.2z" class="fillme"/></svg>Crushes</button>
+      <button data-tab="extras"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3.5l1.7 4.6 4.6 1.7-4.6 1.7L11 16.1l-1.7-4.6-4.6-1.7 4.6-1.7z" class="fillme"/><path d="M18 14l.8 2.2 2.2.8-2.2.8L18 20l-.8-2.2-2.2-.8 2.2-.8z"/><circle cx="5" cy="18.5" r="1.1"/></svg>Extras</button>
+      <button data-tab="profile"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.8"/><circle cx="12" cy="10" r="3.1" class="fillme"/><path d="M6.4 18.6c1.2-2.4 3.2-3.6 5.6-3.6s4.4 1.2 5.6 3.6"/></svg>Profil</button>
     </div>
   </div>
 </div>
@@ -3235,6 +3243,10 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.5.2 (2026-09-22):
+  - Tab-Leiste: eigene Vektor-Icons im CRUSH-Stil statt Emojis (aktiv mit
+    Verlauf, Leuchten und kurzem Pop).
 
   Version 1.5.1 (2026-09-22):
   - Corporate Design: neues CRUSH-Logo (Vektor, animiert), Markenfarben
