@@ -1149,7 +1149,7 @@ function nameDisplayHtml(mainName, subName) {
   }
   return '<span class="name-main">' + esc(main) + '</span> <span class="name-sub">' + esc(sub) + '</span>';
 }
-const ACTIVITY_EMOJI = { cocktail: '🍸 Cocktail', drink: '🍹 Drink', shot: '🥃 Shot', tanz: '💃 Tanz', flirt: '😉 Flirt', kuss: '💋 Kuss', ueberraschung: '🎁 Überraschung', afterparty: '🎉 Afterparty', sex: '🔥 S*x' };
+const ACTIVITY_EMOJI = { flirt: '😉 Flirt', beziehung: '💞 Beziehung', freundschaft: '🤝 Freundschaft', tanz: '💃 Tanz', kuss: '💋 Kuss', cocktail: '🍸 Cocktail', drink: '🍹 Drink', shot: '🥃 Shot', afterparty: '🎉 Afterparty', sex: '🔥 S*x', ueberraschung: '🎁 Überraschung' };
 const INTERESTED_IN_LABEL = { frauen: 'Frauen', maenner: 'Männern', alle: 'Allen' };
 // Nominative/short forms for standalone label:value rows (profile overview),
 // as opposed to INTERESTED_IN_LABEL's dative form used mid-sentence on swipe cards.
@@ -1649,7 +1649,7 @@ async function loadNextCandidate() {
         <div class="swipe-photo">${avatarInner(g.photo_url, '<span style="font-size:120px; font-weight:800; color:rgba(255,255,255,0.92); text-shadow:0 4px 18px rgba(0,0,0,0.25);">' + esc(initials(g.name)) + '</span>')}</div>
         <div class="swipe-body">
           <h3>${esc(g.name)}${g.age ? ' <span class="age-suffix">' + g.age + '</span>' : ''}</h3>
-          <div class="meta">${esc(labelFor(LOOKING_FOR_LABEL, g.looking_for || 'offen'))} · interessiert an ${esc(INTERESTED_IN_LABEL[g.interested_in] || g.interested_in || '–')}${g.home_location ? ' · ' + esc(g.home_location) : ''}</div>
+          <div class="meta">Interessiert an ${esc(INTERESTED_IN_LABEL[g.interested_in] || g.interested_in || '–')}${g.home_location ? ' · ' + esc(g.home_location) : ''}</div>
           <div>${(g.interests || []).map(i => '<span class="tag">' + esc(labelFor(INTEREST_EMOJI, i)) + '</span>').join('')}</div>
           <div>${(g.music_preferences || []).map(i => '<span class="tag">' + esc(labelFor(MUSIC_EMOJI, i)) + '</span>').join('')}</div>
           ${(g.interested_in_activities || []).length ? '<div class="icebreaker-label">💭 Lust auf…</div><div>' + (g.interested_in_activities || []).map(a => '<span class="tag activity">' + esc(ACTIVITY_EMOJI[a] || a) + '</span>').join('') + '</div>' : ''}
@@ -2018,7 +2018,6 @@ function renderProfileCardHtml(g) {
     <div class="profile-card">
       <div class="profile-row"><div class="row-label"><span class="row-icon">🎂</span>Alter</div><div class="row-value">${g.age ? esc(String(g.age)) : '–'}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">📍</span>Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
-      <div class="profile-row"><div class="row-label"><span class="row-icon">🎯</span>Sucht</div><div class="row-value">${esc(g.looking_for ? labelFor(LOOKING_FOR_LABEL, g.looking_for) : '–')}</div></div>
       ${activityChips ? '<div class="profile-row"><div class="row-label"><span class="row-icon">💭</span>Lust auf…</div><div class="row-value chips">' + activityChips + '</div></div>' : ''}
       ${interestChips ? '<div class="profile-row"><div class="row-label"><span class="row-icon">✨</span>Interessen</div><div class="row-value chips">' + interestChips + '</div></div>' : ''}
       ${musicChips ? '<div class="profile-row"><div class="row-label"><span class="row-icon">🎵</span>Musik</div><div class="row-value chips">' + musicChips + '</div></div>' : ''}
@@ -2342,7 +2341,6 @@ function renderProfileView() {
     <div class="profile-card">
       <div class="profile-row"><div class="row-label"><span class="row-icon">🧑</span>Geschlecht</div><div class="row-value">${esc(GENDER_LABEL[g.gender] || g.gender || '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">💘</span>Interessiert an</div><div class="row-value">${esc(INTERESTED_IN_SHORT_LABEL[g.interested_in] || g.interested_in || '–')}</div></div>
-      <div class="profile-row"><div class="row-label"><span class="row-icon">🎯</span>Sucht</div><div class="row-value">${esc(g.looking_for ? labelFor(LOOKING_FOR_LABEL, g.looking_for) : '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">📍</span>Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
     </div>
     <div class="profile-card">
@@ -2407,16 +2405,6 @@ function renderProfileEdit() {
     </div>
     <label for="editAge">Alter <span class="label-optional">Optional</span></label>
     <input id="editAge" type="number" min="18" max="99" value="${g.age ?? ''}" style="max-width:110px;">
-    <label for="editLookingFor">Sucht nach <span class="label-optional">Optional</span></label>
-    <select id="editLookingFor">
-      <option value="offen" ${g.looking_for==='offen'?'selected':''}>Offen</option>
-      <option value="flirt" ${g.looking_for==='flirt'?'selected':''}>Flirt</option>
-      <option value="freundschaft" ${g.looking_for==='freundschaft'?'selected':''}>Freundschaft</option>
-      <option value="beziehung" ${g.looking_for==='beziehung'?'selected':''}>Beziehung</option>
-      <option value="one_night_stand" ${g.looking_for==='one_night_stand'?'selected':''}>One Night Stand 🔥</option>
-      <option value="ueberrasch_mich" ${g.looking_for==='ueberrasch_mich'?'selected':''}>Überrasch mich 🎲</option>
-      <option value="tanzpartner" ${g.looking_for==='tanzpartner'?'selected':''}>Tanzpartner für heute 💃</option>
-    </select>
     <label>Heute Lust auf… <span class="label-optional">Optional</span></label>
     ${chipRowHtml('editActivityChips', ACTIVITY_EMOJI, activeActivities)}
     <label for="editLocation">Wohnort <span class="label-optional">Optional</span></label>
@@ -2547,7 +2535,8 @@ function renderProfileEdit() {
     const gender = document.getElementById('editGender').value;
     const interestedIn = document.getElementById('editInterestedIn').value;
     const age = document.getElementById('editAge').value.trim();
-    const lookingFor = document.getElementById('editLookingFor').value;
+    // «Sucht nach» ist in «Heute Lust auf…» aufgegangen (Mehrfachauswahl); alten Wert behalten.
+    const lookingFor = (currentProfile && currentProfile.looking_for) || 'offen';
     const location = document.getElementById('editLocation').value.trim();
     if (qrErrEl) qrErrEl.textContent = '';
     if (!name) { errEl.textContent = 'Name darf nicht leer sein.'; return; }
