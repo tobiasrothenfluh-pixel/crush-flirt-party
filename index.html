@@ -1488,6 +1488,34 @@ async function checkActiveEvent() {
   }
 }
 checkActiveEvent();
+// Auto-Login: wer auf diesem Handy schon eingecheckt ist, landet beim erneuten
+// Öffnen (z.B. QR-Code nochmal gescannt) direkt in der App – ohne Namen tippen.
+(async function tryAutoLogin() {
+  try {
+    await ensureSession();
+    const { data: { session } } = await sb.auth.getSession();
+    const user = session && session.user;
+    if (!user) return;
+    const eventId = await getActiveEventId();
+    if (!eventId) return;
+    const { data: rows, error } = await sb.from('guests').select('id, event_id, checked_in_at, checked_out_at')
+      .eq('auth_user_id', user.id).eq('event_id', eventId).limit(1);
+    if (error || !rows || !rows.length) return;
+    const r = rows[0];
+    if (!r.checked_in_at || r.checked_out_at) return;          // ausgecheckt: normal neu einchecken
+    if (document.getElementById('loginScreen').classList.contains('hidden')) return; // schon drin
+    myEventId = r.event_id;
+    try { resetCandidateQueue(); } catch (e) {}
+    await seedSeenMatches();
+    await seedSeenSongStatus();
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('mainScreen').classList.remove('hidden');
+    maybeShowA2HSBanner();
+    await showTab('swipe');
+  } catch (e) {
+    console.error(e); // im Zweifel einfach normaler Check-in
+  }
+})();
 // Wer die App vor dem Check-in öffnet, soll nicht ewig "kein Event offen" sehen.
 setInterval(() => {
   if (document.hidden) return;
