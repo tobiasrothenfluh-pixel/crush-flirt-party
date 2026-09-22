@@ -873,6 +873,33 @@
   .tab-badge.bump { animation: badgeBump .6s cubic-bezier(.2,.9,.3,1.4); }
   @keyframes badgeBump { 0% { transform: scale(.3); } 55% { transform: scale(1.35); } 100% { transform: scale(1); } }
   @media (prefers-reduced-motion: reduce) { .tab-badge.bump { animation: none; } }
+  /* Tab-Wechsel: der Inhalt gleitet in Wischrichtung herein */
+  @keyframes tabInR { from { opacity: 0; transform: translate3d(22px, 8px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+  @keyframes tabInL { from { opacity: 0; transform: translate3d(-22px, 8px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+  .content.tab-in-r { animation: tabInR .34s cubic-bezier(.22,.9,.28,1) both; }
+  .content.tab-in-l { animation: tabInL .34s cubic-bezier(.22,.9,.28,1) both; }
+  /* Gleitender Leucht-Balken hinter dem aktiven Tab */
+  .tabbar { position: relative; }
+  .tab-ind { position: absolute; left: 0; border-radius: 16px; opacity: 0; pointer-events: none; z-index: 0;
+    background: linear-gradient(180deg, rgba(247,42,133,0.22), rgba(139,92,246,0.12));
+    box-shadow: 0 0 20px rgba(247,42,133,0.28), inset 0 0 0 1px rgba(255,255,255,0.05);
+    transition: transform .42s cubic-bezier(.2,.9,.25,1.3), width .42s cubic-bezier(.2,.9,.25,1.3), opacity .2s ease; }
+  .tabbar button { position: relative; z-index: 1; transition: color .2s ease, transform .18s ease; }
+  .tabbar button.active { background: transparent; }
+  .tabbar button:active { transform: scale(.93); }
+  /* Karten und Kacheln steigen gestaffelt auf */
+  @keyframes riseIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .match-item, .extras-nav-item, .extras-card, .profile-card { animation: riseIn .38s cubic-bezier(.22,.9,.28,1) both; }
+  .match-item:nth-child(2), .extras-nav-item:nth-child(2) { animation-delay: .04s; }
+  .match-item:nth-child(3), .extras-nav-item:nth-child(3) { animation-delay: .08s; }
+  .match-item:nth-child(4), .extras-nav-item:nth-child(4) { animation-delay: .12s; }
+  .match-item:nth-child(5), .extras-nav-item:nth-child(5) { animation-delay: .16s; }
+  .match-item:nth-child(6), .extras-nav-item:nth-child(6) { animation-delay: .2s; }
+  .match-item:nth-child(n+7) { animation-delay: .24s; }
+  @media (prefers-reduced-motion: reduce) {
+    .content.tab-in-r, .content.tab-in-l, .match-item, .extras-nav-item, .extras-card, .profile-card { animation: none; }
+    .tab-ind { transition: opacity .2s ease; }
+  }
   /* Eigene Icons im Text/Buttons/Kacheln (statt Emojis) */
   .ci { width: 1.15em; height: 1.15em; vertical-align: -0.22em; fill: none; stroke: currentColor; stroke-width: 1.7;
     stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
@@ -1096,7 +1123,7 @@ c-57 -19 -98 -136 -193 -552 -65 -288 -59 -331 51 -371 40 -15 80 0 94 34 6
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.5.5 · 2026</div>
+    <div class="version-footer">Version 1.5.6 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -1560,6 +1587,7 @@ checkActiveEvent();
     document.getElementById('mainScreen').classList.remove('hidden');
     maybeShowA2HSBanner();
     await showTab('swipe');
+    requestAnimationFrame(moveTabIndicator);
   } catch (e) {
     console.error(e); // im Zweifel einfach normaler Check-in
   }
@@ -1699,6 +1727,36 @@ function setFirstTimeSetupLock(active) {
   });
 }
 
+// Der Inhalt gleitet in die Richtung herein, in die man in der Leiste wechselt,
+// und der Leucht-Balken fährt zum neuen Tab.
+const TAB_ORDER = ['swipe', 'matches', 'extras', 'profile'];
+let lastTabIdx = 0;
+function animateTabSwitch(tab) {
+  const pane = document.getElementById('tab-' + tab);
+  if (!pane) return;
+  const idx = TAB_ORDER.indexOf(tab);
+  const dir = idx < 0 ? 1 : (idx >= lastTabIdx ? 1 : -1);
+  if (idx >= 0) lastTabIdx = idx;
+  pane.classList.remove('tab-in-r', 'tab-in-l');
+  void pane.offsetWidth;                                  // Animation neu starten
+  pane.classList.add(dir > 0 ? 'tab-in-r' : 'tab-in-l');
+  pane.scrollTop = 0;
+}
+function moveTabIndicator() {
+  const bar = document.getElementById('tabbar');
+  if (!bar) return;
+  let ind = bar.querySelector('.tab-ind');
+  if (!ind) { ind = document.createElement('div'); ind.className = 'tab-ind'; bar.insertBefore(ind, bar.firstChild); }
+  const btn = bar.querySelector('button.active');
+  if (!btn || !btn.offsetWidth) { ind.style.opacity = '0'; return; }
+  ind.style.width = btn.offsetWidth + 'px';
+  ind.style.height = btn.offsetHeight + 'px';
+  ind.style.top = btn.offsetTop + 'px';
+  ind.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
+  ind.style.opacity = '1';
+}
+window.addEventListener('resize', () => moveTabIndicator());
+
 async function showTab(tab) {
   const sendErr = document.getElementById('chatSendErr');
   if (sendErr) sendErr.textContent = '';
@@ -1707,10 +1765,14 @@ async function showTab(tab) {
   });
   document.getElementById('chatInputRow').classList.toggle('hidden', tab !== 'chat');
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.remove('active'));
-  if (tab === 'swipe') { document.querySelector('#tabbar button[data-tab="swipe"]').classList.add('active'); await loadNextCandidate(); updateLiveGuestCount(); }
-  if (tab === 'matches') { document.querySelector('#tabbar button[data-tab="matches"]').classList.add('active'); await loadMatches(); }
-  if (tab === 'profile') { document.querySelector('#tabbar button[data-tab="profile"]').classList.add('active'); await loadProfile(); }
-  if (tab === 'extras') { document.querySelector('#tabbar button[data-tab="extras"]').classList.add('active'); await renderExtras(); }
+  const activeBtn = document.querySelector('#tabbar button[data-tab="' + tab + '"]');
+  if (activeBtn) activeBtn.classList.add('active');
+  animateTabSwitch(tab);
+  requestAnimationFrame(moveTabIndicator);
+  if (tab === 'swipe') { await loadNextCandidate(); updateLiveGuestCount(); }
+  if (tab === 'matches') { await loadMatches(); }
+  if (tab === 'profile') { await loadProfile(); }
+  if (tab === 'extras') { await renderExtras(); }
 }
 
 document.querySelectorAll('#tabbar button').forEach(b => {
@@ -3345,6 +3407,11 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.5.6 (2026-09-22):
+  - Tab-Wechsel animiert: der Inhalt gleitet in Wischrichtung herein, ein
+    Leucht-Balken fährt zum neuen Tab, das Icon poppt kurz auf.
+  - Listen, Kacheln und Karten steigen gestaffelt auf.
 
   Version 1.5.5 (2026-09-22):
   - Startseite: Datum, Ort und DJ der Event-Kachel mit eigenen Icons;
