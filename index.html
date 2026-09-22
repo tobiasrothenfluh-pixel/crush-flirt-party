@@ -92,6 +92,10 @@
   .login-wrap { justify-content: flex-start !important; }
   .login-wrap > :first-child { margin-top: auto; }
   #loginFormArea, #noEventNotice { margin-bottom: auto; }
+  /* Check-in-Formular mittig und etwas schmaler */
+  #loginFormArea { width: 100%; max-width: 300px; margin-left: auto; margin-right: auto; }
+  #loginFormArea label { text-align: center; }
+  #loginQr { text-align: center; }
   @media (max-height: 700px) {
     .login-logo { padding-top: 18px; }
     .login-logo svg { max-width: 210px; }
@@ -906,7 +910,6 @@ c-57 -19 -98 -136 -193 -552 -65 -288 -59 -331 51 -371 40 -15 80 0 94 34 6
       <p class="sub" id="loginSub">Gib deinen Crush Name ein und los geht's</p>
 
       <div id="loginFormArea">
-        <div id="a2hsLogin" class="a2hs-login hidden">📲 <b>Tipp:</b> Erst via Teilen ⬆️ → «Zum Home-Bildschirm» hinzufügen, dann <b>dort</b> einchecken.</div>
         <label for="loginQr">Crush Name</label>
         <input id="loginQr" type="text" placeholder="z.B. NACHTFALTER">
         <button class="primary-btn" id="loginBtn">Einchecken</button>
@@ -1360,14 +1363,6 @@ async function checkActiveEvent() {
   }
 }
 checkActiveEvent();
-// iOS-Safari (nicht als Home-Bildschirm-App): Tipp vor dem Check-in zeigen.
-(function showLoginA2HS() {
-  try {
-    const ua = window.navigator.userAgent || '';
-    const isIOS = /iP(hone|od|ad)/.test(ua) || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
-    if (isIOS && !isStandaloneDisplay()) document.getElementById('a2hsLogin').classList.remove('hidden');
-  } catch (e) {}
-})();
 // Wer die App vor dem Check-in öffnet, soll nicht ewig "kein Event offen" sehen.
 setInterval(() => {
   if (document.hidden) return;
