@@ -864,6 +864,15 @@
   .tabbar button.active .ti .fillme { fill: url(#tabGrad); }
   @keyframes tiPop { 0% { transform: scale(.8); } 60% { transform: translateY(-1px) scale(1.2); } 100% { transform: translateY(-1px) scale(1.12); } }
   @media (prefers-reduced-motion: reduce) { .tabbar button.active .ti { animation: none; } }
+  /* Zähler auf dem Crushes-Icon: neue Crushes + ungelesene Nachrichten */
+  .tabbar button { position: relative; }
+  .tab-badge { position: absolute; top: 3px; left: calc(50% + 5px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: linear-gradient(135deg, #f72a85, #d63ab8); color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+    box-shadow: 0 0 0 2px #120d1a, 0 0 10px rgba(247,42,133,0.8); pointer-events: none; }
+  .tab-badge[hidden] { display: none; }
+  .tab-badge.bump { animation: badgeBump .6s cubic-bezier(.2,.9,.3,1.4); }
+  @keyframes badgeBump { 0% { transform: scale(.3); } 55% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .tab-badge.bump { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .swipe-photo::after, #swipeCrush { animation: none; } }
   /* Wischen: Karte folgt dem Finger, Stempel zeigen die Richtung */
   #swipeArea .swipe-card { position: relative; will-change: transform; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: pan-y;
@@ -1075,7 +1084,7 @@ c-57 -19 -98 -136 -193 -552 -65 -288 -59 -331 51 -371 40 -15 80 0 94 34 6
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.5.2 · 2026</div>
+    <div class="version-footer">Version 1.5.3 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -1163,7 +1172,7 @@ M6067 6293 c-12 -11 -8 -1787 4 -1913 48 -530 259 -860 684 -1070 249 -123
     <div class="tabbar" id="tabbar">
       <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="tabGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f72a85"/><stop offset=".55" stop-color="#d63ab8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs></svg>
       <button data-tab="swipe" class="active"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5.2" width="10.5" height="14.5" rx="2.4" transform="rotate(-14 8.4 12.4)" opacity=".55"/><rect x="9" y="4" width="11" height="15.5" rx="2.6"/><path d="M14.5 14.2c-1.9-1.3-3-2.3-3-3.5 0-.9.7-1.5 1.5-1.5.6 0 1.1.3 1.5.8.4-.5.9-.8 1.5-.8.8 0 1.5.6 1.5 1.5 0 1.2-1.1 2.2-3 3.5z" class="fillme"/></svg>Swipe</button>
-      <button data-tab="matches"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5l-3.6-2.6H6.5A3 3 0 0 1 3.5 15V7A3 3 0 0 1 6.5 4h11a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2z"/><path d="M12 14.6c-2.3-1.5-3.6-2.8-3.6-4.2 0-1.1.8-1.9 1.8-1.9.8 0 1.4.4 1.8 1 .4-.6 1-1 1.8-1 1 0 1.8.8 1.8 1.9 0 1.4-1.3 2.7-3.6 4.2z" class="fillme"/></svg>Crushes</button>
+      <button data-tab="matches"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5l-3.6-2.6H6.5A3 3 0 0 1 3.5 15V7A3 3 0 0 1 6.5 4h11a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2z"/><path d="M12 14.6c-2.3-1.5-3.6-2.8-3.6-4.2 0-1.1.8-1.9 1.8-1.9.8 0 1.4.4 1.8 1 .4-.6 1-1 1.8-1 1 0 1.8.8 1.8 1.9 0 1.4-1.3 2.7-3.6 4.2z" class="fillme"/></svg>Crushes<span class="tab-badge" id="crushBadge" hidden></span></button>
       <button data-tab="extras"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3.5l1.7 4.6 4.6 1.7-4.6 1.7L11 16.1l-1.7-4.6-4.6-1.7 4.6-1.7z" class="fillme"/><path d="M18 14l.8 2.2 2.2.8-2.2.8L18 20l-.8-2.2-2.2-.8 2.2-.8z"/><circle cx="5" cy="18.5" r="1.1"/></svg>Extras</button>
       <button data-tab="profile"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.8"/><circle cx="12" cy="10" r="3.1" class="fillme"/><path d="M6.4 18.6c1.2-2.4 3.2-3.6 5.6-3.6s4.4 1.2 5.6 3.6"/></svg>Profil</button>
     </div>
@@ -2035,6 +2044,13 @@ async function seedSeenMatches() {
   try {
     const rows = await callRpc('get_my_matches', {});
     saveSeenMatches(new Set(rows.map(r => r.match_id)));
+    let fresh = false;
+    try { fresh = localStorage.getItem(VIEWED_MATCHES_KEY) === null; } catch (e) {}
+    if (fresh) {
+      markAllMatchesViewed(rows);
+      rows.forEach(r => { if (r.last_message_at) markChatRead(r.match_id, r.last_message_at); });
+    }
+    updateCrushBadge(rows, { quiet: true });
   } catch (e) {}
 }
 // Generic toast: reused for new-crush and song-status notifications, each with
@@ -2127,6 +2143,66 @@ function showCodePromptModal(message) {
     setTimeout(() => input.focus(), 50);
   });
 }
+// ---------- Zähler auf dem Crushes-Icon ----------
+// "Neu" = Crush noch nie im Crushes-Tab gesehen; "ungelesen" = letzte Nachricht
+// kommt vom Gegenüber und ist neuer als das, was man im Chat schon gesehen hat.
+const VIEWED_MATCHES_KEY = 'crush_viewed_matches', READ_AT_KEY = 'crush_read_at';
+function lsGet(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function markChatRead(matchId, ts) {
+  if (!matchId) return;
+  const r = lsGet(READ_AT_KEY, {});
+  const t = ts || new Date().toISOString();
+  if (!r[matchId] || new Date(t) > new Date(r[matchId])) { r[matchId] = t; lsSet(READ_AT_KEY, r); }
+}
+function isUnreadMatch(r, readAt) {
+  if (!r.last_message || r.last_message_is_me || !r.last_message_at) return false;
+  const t = readAt[r.match_id];
+  return !t || new Date(r.last_message_at) > new Date(t);
+}
+function openChatMatchId() {
+  const pane = document.getElementById('tab-chat');
+  return (pane && !pane.classList.contains('hidden')) ? currentMatchId : null;
+}
+function matchLabel(r) { return r.partner_name && r.partner_name !== 'Gast' ? r.partner_name : r.partner_qr; }
+let crushBadgeCount = 0, msgSeenAt = null, badgeRows = null;
+function updateCrushBadge(rows, opts) {
+  opts = opts || {};
+  badgeRows = rows;
+  const open = openChatMatchId();
+  if (open) { const cur = rows.find(r => r.match_id === open); markChatRead(open, cur && cur.last_message_at); }
+  const viewed = new Set(lsGet(VIEWED_MATCHES_KEY, []));
+  const readAt = lsGet(READ_AT_KEY, {});
+  let n = 0;
+  rows.forEach(r => { if (!viewed.has(r.match_id) || isUnreadMatch(r, readAt)) n++; });
+  const b = document.getElementById('crushBadge');
+  if (b) {
+    if (n > 0) {
+      b.textContent = n > 9 ? '9+' : String(n);
+      b.hidden = false;
+      if (n > crushBadgeCount) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+    } else b.hidden = true;
+  }
+  crushBadgeCount = n;
+  // Hinweis oben bei einer neuen Nachricht (nicht im offenen Chat, nicht beim ersten Laden).
+  const prev = msgSeenAt;
+  msgSeenAt = {};
+  rows.forEach(r => { if (r.last_message_at) msgSeenAt[r.match_id] = r.last_message_at; });
+  if (prev && !opts.quiet) {
+    const nw = rows.find(r => r.match_id !== open && isUnreadMatch(r, readAt) && prev[r.match_id] !== r.last_message_at);
+    if (nw) {
+      const label = matchLabel(nw);
+      feedbackTap();
+      showToast('💬 Neue Nachricht von ' + label, () => openChat(nw.match_id, label, nw.partner_qr, nw.partner_id));
+    }
+  }
+}
+function markAllMatchesViewed(rows) {
+  const viewed = new Set(lsGet(VIEWED_MATCHES_KEY, []));
+  rows.forEach(r => viewed.add(r.match_id));
+  lsSet(VIEWED_MATCHES_KEY, Array.from(viewed));
+}
+
 function showCrushToast(label) {
   feedbackMatch();
   showToast('🎉 Neuer Crush mit ' + label + '!', () => showTab('matches'));
@@ -2145,13 +2221,17 @@ async function pollForNewCrushes() {
       }
     });
     saveSeenMatches(seen);
+    const onCrushes = !document.getElementById('tab-matches').classList.contains('hidden');
+    if (onCrushes) markAllMatchesViewed(rows);
+    updateCrushBadge(rows, { quiet: !!firstNew });
     if (firstNew) {
-      const label = firstNew.partner_name && firstNew.partner_name !== 'Gast' ? firstNew.partner_name : firstNew.partner_qr;
-      showCrushToast(label);
+      showCrushToast(matchLabel(firstNew));
+      if (onCrushes) loadMatches();
     }
   } catch (e) {}
 }
-setInterval(pollForNewCrushes, 15000);
+setInterval(pollForNewCrushes, 12000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pollForNewCrushes(); });
 
 // ---------- Live-Zähler: eingecheckte Gäste ----------
 async function updateLiveGuestCount() {
@@ -2336,6 +2416,9 @@ async function loadMatches() {
   el.innerHTML = '<div class="loading">Lade…</div>';
   try {
     const rows = await callRpc('get_my_matches', {});
+    markAllMatchesViewed(rows);
+    updateCrushBadge(rows);
+    const readAtMap = lsGet(READ_AT_KEY, {});
     if (!rows.length) {
       el.innerHTML = `
         <div class="crush-empty">
@@ -2367,7 +2450,7 @@ async function loadMatches() {
       const previewText = hasMsg
         ? (r.last_message_is_me ? 'Du: ' + r.last_message : r.last_message)
         : '🎉 Neuer Crush – schreib als Erste:r!';
-      const showDot = hasMsg && !r.last_message_is_me;
+      const showDot = isUnreadMatch(r, readAtMap);
       const timeLabel = formatRelativeTime(r.last_message_at || r.created_at);
       return '<div class="match-item" data-match-id="' + esc(r.match_id) + '">' +
         '<div class="match-row" data-match-id="' + esc(r.match_id) + '" data-partner-id="' + esc(r.partner_id) + '" data-partner-name="' + esc(displayName) + '" data-partner-qr="' + esc(r.partner_qr) + '">' +
@@ -2483,6 +2566,7 @@ let currentPartnerId = null;
 
 async function openChat(matchId, partnerName, partnerQr, partnerId) {
   currentMatchId = matchId;
+  markAllMatchesViewed([{ match_id: matchId }]);
   currentPartnerId = partnerId || null;
   document.getElementById('chatPartnerName').innerHTML = nameDisplayHtml(partnerName, partnerQr);
   document.getElementById('chatAvatar').textContent = initials(partnerName || partnerQr);
@@ -2538,6 +2622,8 @@ async function loadChatMessages(opts) {
   if (!silent) el.innerHTML = '<div class="loading">Lade…</div>';
   try {
     const rows = await callRpc('get_match_messages', { p_match_id: currentMatchId });
+    if (rows.length) markChatRead(currentMatchId, rows[rows.length - 1].created_at);
+    if (badgeRows) updateCrushBadge(badgeRows, { quiet: true });
     // In silent (background-poll) mode, skip the re-render entirely when the
     // message count hasn't changed — avoids a flicker/scroll-jump every 4s
     // for the (very common) case where nothing new has arrived.
@@ -3243,6 +3329,14 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.5.3 (2026-09-22):
+  - Zähler auf dem Crushes-Icon: neue Crushes + ungelesene Nachrichten,
+    springt kurz auf, wenn etwas dazukommt.
+  - Hinweis oben auch bei neuer Chat-Nachricht ("💬 Neue Nachricht von …"),
+    Antippen öffnet direkt den Chat. Pinker Punkt in der Liste nur noch
+    bei wirklich ungelesenen Nachrichten.
+  - Beim Zurückkehren in die App wird sofort nach Neuem geschaut.
 
   Version 1.5.2 (2026-09-22):
   - Tab-Leiste: eigene Vektor-Icons im CRUSH-Stil statt Emojis (aktiv mit
