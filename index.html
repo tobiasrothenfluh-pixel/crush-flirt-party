@@ -901,6 +901,7 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="tabGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f72a85"/><stop offset=".55" stop-color="#d63ab8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs></svg>
 
 <div class="phone">
   <div class="notch"></div>
@@ -1095,7 +1096,7 @@ c-57 -19 -98 -136 -193 -552 -65 -288 -59 -331 51 -371 40 -15 80 0 94 34 6
          gesperrt (siehe newIdentityLink-Handler), damit Gäste nicht aus Versehen
          ihre Identität zurücksetzen. -->
     <div id="newIdentityLink" role="button" tabindex="0" style="text-align:center; margin-top:2px; padding:10px; font-size:9.5px; color:#4a4256; cursor:pointer;">Reset</div>
-    <div class="version-footer">Version 1.5.4 · 2026</div>
+    <div class="version-footer">Version 1.5.5 · 2026</div>
   </div>
 
   <div class="screen hidden" id="mainScreen">
@@ -1181,7 +1182,6 @@ M6067 6293 c-12 -11 -8 -1787 4 -1913 48 -530 259 -860 684 -1070 249 -123
     </div>
 
     <div class="tabbar" id="tabbar">
-      <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="tabGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f72a85"/><stop offset=".55" stop-color="#d63ab8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs></svg>
       <button data-tab="swipe" class="active"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5.2" width="10.5" height="14.5" rx="2.4" transform="rotate(-14 8.4 12.4)" opacity=".55"/><rect x="9" y="4" width="11" height="15.5" rx="2.6"/><path d="M14.5 14.2c-1.9-1.3-3-2.3-3-3.5 0-.9.7-1.5 1.5-1.5.6 0 1.1.3 1.5.8.4-.5.9-.8 1.5-.8.8 0 1.5.6 1.5 1.5 0 1.2-1.1 2.2-3 3.5z" class="fillme"/></svg>Swipe</button>
       <button data-tab="matches"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5l-3.6-2.6H6.5A3 3 0 0 1 3.5 15V7A3 3 0 0 1 6.5 4h11a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2z"/><path d="M12 14.6c-2.3-1.5-3.6-2.8-3.6-4.2 0-1.1.8-1.9 1.8-1.9.8 0 1.4.4 1.8 1 .4-.6 1-1 1.8-1 1 0 1.8.8 1.8 1.9 0 1.4-1.3 2.7-3.6 4.2z" class="fillme"/></svg>Crushes<span class="tab-badge" id="crushBadge" hidden></span></button>
       <button data-tab="extras"><svg class="icon ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3.5l1.7 4.6 4.6 1.7-4.6 1.7L11 16.1l-1.7-4.6-4.6-1.7 4.6-1.7z" class="fillme"/><path d="M18 14l.8 2.2 2.2.8-2.2.8L18 20l-.8-2.2-2.2-.8 2.2-.8z"/><circle cx="5" cy="18.5" r="1.1"/></svg>Extras</button>
@@ -1191,6 +1191,11 @@ M6067 6293 c-12 -11 -8 -1787 4 -1913 48 -530 259 -860 684 -1070 249 -123
 </div>
 
 <script>
+const CI_PATHS = {"music": "<path d=\"M9 17.5V5.4l10-2v10.2\"/><circle cx=\"6.6\" cy=\"18\" r=\"2.6\" class=\"fillme\"/><circle cx=\"16.6\" cy=\"16\" r=\"2.6\" class=\"fillme\"/>", "mail": "<path d=\"M4.2 9.6h3.2L15.8 5v14l-8.4-4.6H4.2A1.5 1.5 0 0 1 2.7 13v-1.9a1.5 1.5 0 0 1 1.5-1.5z\" class=\"fillme\"/><path d=\"M18.8 9.4a3.7 3.7 0 0 1 0 5.2\"/><path d=\"M21 7.2a6.8 6.8 0 0 1 0 9.6\"/><path d=\"M7.6 15.2v2.4a2 2 0 0 0 3.5 1.3\"/>", "shuffle": "<path d=\"M3 7.2h3.2c1.2 0 2.3.6 3 1.6l3.6 5.4c.7 1 1.8 1.6 3 1.6H21\"/><path d=\"M3 16.8h3.2c1.2 0 2.3-.6 3-1.6l.7-1.1\"/><path d=\"M14.1 9.5l.7-1.1c.7-1 1.8-1.6 3-1.6H21\"/><path d=\"M18.6 4.4 21 6.8l-2.4 2.4\"/><path d=\"M18.6 13.4 21 15.8l-2.4 2.4\"/>", "tv": "<rect x=\"3\" y=\"7\" width=\"18\" height=\"12.5\" rx=\"2.8\"/><path d=\"M8.6 3 12 6.2 15.4 3\"/><path d=\"M12 17c-1.9-1.3-3-2.3-3-3.5 0-.9.7-1.6 1.5-1.6.6 0 1.1.3 1.5.8.4-.5.9-.8 1.5-.8.8 0 1.5.7 1.5 1.6 0 1.2-1.1 2.2-3 3.5z\" class=\"fillme\"/>", "trophy": "<path d=\"M7.8 4h8.4v4.6a4.2 4.2 0 0 1-8.4 0z\" class=\"fillme\"/><path d=\"M7.8 5.6H5.4a2.6 2.6 0 0 0 2.6 4.6\"/><path d=\"M16.2 5.6h2.4a2.6 2.6 0 0 1-2.6 4.6\"/><path d=\"M12 12.8v3.4\"/><path d=\"M8.6 20.2h6.8\"/><path d=\"M9.8 20.2c0-1.7.8-2.6 2.2-2.6s2.2.9 2.2 2.6\"/>", "ticket": "<path d=\"M3.6 9.4V7.6A1.6 1.6 0 0 1 5.2 6h13.6a1.6 1.6 0 0 1 1.6 1.6v1.8a2.7 2.7 0 0 0 0 5.2v1.8a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6v-1.8a2.7 2.7 0 0 0 0-5.2z\"/><path d=\"M9.4 9.8v1.1M9.4 13.4v1.1\"/>", "headphones": "<path d=\"M4 15.4v-3.2a8 8 0 0 1 16 0v3.2\"/><rect x=\"2.6\" y=\"14\" width=\"4.6\" height=\"6.2\" rx=\"2.3\" class=\"fillme\"/><rect x=\"16.8\" y=\"14\" width=\"4.6\" height=\"6.2\" rx=\"2.3\" class=\"fillme\"/>", "instagram": "<rect x=\"3.6\" y=\"3.6\" width=\"16.8\" height=\"16.8\" rx=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"3.9\"/><circle cx=\"16.9\" cy=\"7.1\" r=\"1.15\" class=\"fillme\"/>", "disc": "<circle cx=\"12\" cy=\"12\" r=\"8.6\"/><circle cx=\"12\" cy=\"12\" r=\"2.4\" class=\"fillme\"/>", "chat": "<path d=\"M12 20.5l-3.6-2.6H6.5A3 3 0 0 1 3.5 15V7A3 3 0 0 1 6.5 4h11a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2z\"/><path d=\"M8 9h8M8 12.5h5\"/>", "refresh": "<path d=\"M20 12a8 8 0 1 1-2.5-5.8\"/><path d=\"M20.3 4.6v4.2h-4.2\"/>", "calendar": "<rect x=\"3.2\" y=\"5\" width=\"17.6\" height=\"15.4\" rx=\"3\"/><path d=\"M3.2 9.8h17.6\"/><path d=\"M8 2.8v3.6M16 2.8v3.6\"/><circle cx=\"8.4\" cy=\"14\" r=\"1.3\" class=\"fillme\"/>", "pin": "<path d=\"M12 21.2c4-4.5 6-7.9 6-10.4a6 6 0 1 0-12 0c0 2.5 2 5.9 6 10.4z\"/><circle cx=\"12\" cy=\"10.8\" r=\"2.4\" class=\"fillme\"/>", "heart": "<path d=\"M12 20.2C6.9 16.9 4 14.1 4 10.6 4 8 6 6 8.5 6c1.5 0 2.8.7 3.5 1.9C12.7 6.7 14 6 15.5 6 18 6 20 8 20 10.6c0 3.5-2.9 6.3-8 9.6z\" class=\"fillme\"/>"};
+function ci(name, cls) {
+  return '<svg class="ci ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (CI_PATHS[name] || '') + '</svg>';
+}
+
 const SUPABASE_URL = 'https://nvgohjfbzupukcguxnpy.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_k374bKklKAN4V88XEwjE3g_bG_R4JWZ';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -1504,9 +1509,9 @@ function renderEventCard(ev) {
   document.getElementById('eventLiveText').textContent = ev.status === 'running' ? 'LIVE · JETZT EINCHECKEN' : ev.status === 'upcoming' ? 'NÄCHSTES EVENT' : 'CHECK-IN OFFEN';
   card.classList.toggle('soon', ev.status === 'upcoming');
   document.getElementById('eventName').textContent = ev.name || 'CRUSH Event';
-  document.getElementById('eventMeta').textContent = ['📅 ' + dateTxt, place ? '📍 ' + place : ''].filter(x => x && x !== '📅 ').join('   ');
+  document.getElementById('eventMeta').innerHTML = [dateTxt ? ci('calendar', 'grad') + ' ' + esc(dateTxt) : '', place ? ci('pin', 'grad') + ' ' + esc(place) : ''].filter(Boolean).join('&nbsp;&nbsp; ');
   const dj = document.getElementById('eventDj');
-  dj.textContent = ev.dj_name ? '🎧 ' + ev.dj_name : '';
+  dj.innerHTML = ev.dj_name ? ci('headphones', 'grad') + ' ' + esc(ev.dj_name) : '';
   dj.classList.toggle('hidden', !ev.dj_name);
   card.classList.remove('hidden');
 }
@@ -2154,11 +2159,6 @@ function showCodePromptModal(message) {
     setTimeout(() => input.focus(), 50);
   });
 }
-const CI_PATHS = {"music": "<path d=\"M9 17.5V5.4l10-2v10.2\"/><circle cx=\"6.6\" cy=\"18\" r=\"2.6\" class=\"fillme\"/><circle cx=\"16.6\" cy=\"16\" r=\"2.6\" class=\"fillme\"/>", "mail": "<path d=\"M4.2 9.6h3.2L15.8 5v14l-8.4-4.6H4.2A1.5 1.5 0 0 1 2.7 13v-1.9a1.5 1.5 0 0 1 1.5-1.5z\" class=\"fillme\"/><path d=\"M18.8 9.4a3.7 3.7 0 0 1 0 5.2\"/><path d=\"M21 7.2a6.8 6.8 0 0 1 0 9.6\"/><path d=\"M7.6 15.2v2.4a2 2 0 0 0 3.5 1.3\"/>", "shuffle": "<path d=\"M3 7.2h3.2c1.2 0 2.3.6 3 1.6l3.6 5.4c.7 1 1.8 1.6 3 1.6H21\"/><path d=\"M3 16.8h3.2c1.2 0 2.3-.6 3-1.6l.7-1.1\"/><path d=\"M14.1 9.5l.7-1.1c.7-1 1.8-1.6 3-1.6H21\"/><path d=\"M18.6 4.4 21 6.8l-2.4 2.4\"/><path d=\"M18.6 13.4 21 15.8l-2.4 2.4\"/>", "tv": "<rect x=\"3\" y=\"7\" width=\"18\" height=\"12.5\" rx=\"2.8\"/><path d=\"M8.6 3 12 6.2 15.4 3\"/><path d=\"M12 17c-1.9-1.3-3-2.3-3-3.5 0-.9.7-1.6 1.5-1.6.6 0 1.1.3 1.5.8.4-.5.9-.8 1.5-.8.8 0 1.5.7 1.5 1.6 0 1.2-1.1 2.2-3 3.5z\" class=\"fillme\"/>", "trophy": "<path d=\"M7.8 4h8.4v4.6a4.2 4.2 0 0 1-8.4 0z\" class=\"fillme\"/><path d=\"M7.8 5.6H5.4a2.6 2.6 0 0 0 2.6 4.6\"/><path d=\"M16.2 5.6h2.4a2.6 2.6 0 0 1-2.6 4.6\"/><path d=\"M12 12.8v3.4\"/><path d=\"M8.6 20.2h6.8\"/><path d=\"M9.8 20.2c0-1.7.8-2.6 2.2-2.6s2.2.9 2.2 2.6\"/>", "ticket": "<path d=\"M3.6 9.4V7.6A1.6 1.6 0 0 1 5.2 6h13.6a1.6 1.6 0 0 1 1.6 1.6v1.8a2.7 2.7 0 0 0 0 5.2v1.8a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6v-1.8a2.7 2.7 0 0 0 0-5.2z\"/><path d=\"M9.4 9.8v1.1M9.4 13.4v1.1\"/>", "headphones": "<path d=\"M4 15.4v-3.2a8 8 0 0 1 16 0v3.2\"/><rect x=\"2.6\" y=\"14\" width=\"4.6\" height=\"6.2\" rx=\"2.3\" class=\"fillme\"/><rect x=\"16.8\" y=\"14\" width=\"4.6\" height=\"6.2\" rx=\"2.3\" class=\"fillme\"/>", "instagram": "<rect x=\"3.6\" y=\"3.6\" width=\"16.8\" height=\"16.8\" rx=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"3.9\"/><circle cx=\"16.9\" cy=\"7.1\" r=\"1.15\" class=\"fillme\"/>", "disc": "<circle cx=\"12\" cy=\"12\" r=\"8.6\"/><circle cx=\"12\" cy=\"12\" r=\"2.4\" class=\"fillme\"/>", "chat": "<path d=\"M12 20.5l-3.6-2.6H6.5A3 3 0 0 1 3.5 15V7A3 3 0 0 1 6.5 4h11a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-2z\"/><path d=\"M8 9h8M8 12.5h5\"/>", "refresh": "<path d=\"M20 12a8 8 0 1 1-2.5-5.8\"/><path d=\"M20.3 4.6v4.2h-4.2\"/>", "heart": "<path d=\"M12 20.2C6.9 16.9 4 14.1 4 10.6 4 8 6 6 8.5 6c1.5 0 2.8.7 3.5 1.9C12.7 6.7 14 6 15.5 6 18 6 20 8 20 10.6c0 3.5-2.9 6.3-8 9.6z\" class=\"fillme\"/>"};
-function ci(name, cls) {
-  return '<svg class="ci ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (CI_PATHS[name] || '') + '</svg>';
-}
-
 // ---------- Zähler auf dem Crushes-Icon ----------
 // "Neu" = Crush noch nie im Crushes-Tab gesehen; "ungelesen" = letzte Nachricht
 // kommt vom Gegenüber und ist neuer als das, was man im Chat schon gesehen hat.
@@ -2398,7 +2398,7 @@ function renderProfileCardHtml(g) {
   return `
     <div class="profile-card">
       <div class="profile-row"><div class="row-label"><span class="row-icon">🎂</span>Alter</div><div class="row-value">${g.age ? esc(String(g.age)) : '–'}</div></div>
-      <div class="profile-row"><div class="row-label"><span class="row-icon">📍</span>Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
+      <div class="profile-row"><div class="row-label">${ci('pin', 'row-icon grad')}Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
       ${activityChips ? '<div class="profile-row"><div class="row-label"><span class="row-icon">💭</span>Lust auf…</div><div class="row-value chips">' + activityChips + '</div></div>' : ''}
       ${interestChips ? '<div class="profile-row"><div class="row-label"><span class="row-icon">✨</span>Interessen</div><div class="row-value chips">' + interestChips + '</div></div>' : ''}
       ${musicChips ? '<div class="profile-row"><div class="row-label"><span class="row-icon">🎵</span>Musik</div><div class="row-value chips">' + musicChips + '</div></div>' : ''}
@@ -2747,7 +2747,7 @@ function renderProfileView() {
     <div class="profile-card">
       <div class="profile-row"><div class="row-label"><span class="row-icon">🧑</span>Geschlecht</div><div class="row-value">${esc(GENDER_LABEL[g.gender] || g.gender || '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">💘</span>Interessiert an</div><div class="row-value">${esc(INTERESTED_IN_SHORT_LABEL[g.interested_in] || g.interested_in || '–')}</div></div>
-      <div class="profile-row"><div class="row-label"><span class="row-icon">📍</span>Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
+      <div class="profile-row"><div class="row-label">${ci('pin', 'row-icon grad')}Wohnort</div><div class="row-value">${esc(g.home_location || '–')}</div></div>
       <div class="profile-row"><div class="row-label"><span class="row-icon">💭</span>Heute Lust auf…</div><div class="row-value chips">${activityChips || '<span class="row-value muted">–</span>'}</div></div>
     </div>
     <div class="profile-card">
@@ -3345,6 +3345,11 @@ function showRandomMatchResult(r) {
 
 <!--
   CHANGELOG
+
+  Version 1.5.5 (2026-09-22):
+  - Startseite: Datum, Ort und DJ der Event-Kachel mit eigenen Icons;
+    Wohnort im Profil ebenfalls. Die Verlaufs-Definition liegt jetzt
+    zuoberst im Dokument, damit die Icons auch vor dem Check-in leuchten.
 
   Version 1.5.4 (2026-09-22):
   - Eigene Icons auch in den Extras (Musik, Shoutouts, Zufalls-Match,
